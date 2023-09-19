@@ -810,7 +810,7 @@ struct Card {
 public:
     Card() : CardID(DECK_SIZE) {}
     Card(int cardID) : CardID(cardID) {}
-    Card(int cardNumber, int suit) : CardID(suit* CARDS_PER_SUIT + cardNumber) {}
+    Card(int cardNumber, int suit) : CardID(cardNumber * SUITS_PER_DECK + suit) {}//Fix
 
     /// <summary>
     /// CardID is a number from 0 to 51 representing a playing card.
@@ -895,7 +895,7 @@ class Player;
 struct Guess {
 	Guess () : targetPlayerNumber(-1), currentPlayerNumber(-1), card(Card(DECK_SIZE)), guessResult(GuessResultID::None), numberOfCardsRecieved(-1) {}
 	Guess(int TargetPlayerNumber, int CurrentPlayerNumber, int CardID, int GuessResult = GuessResultID::None, int NumberOfCardsRecieved = 1) : 
-		targetPlayerNumber(TargetPlayerNumber), currentPlayerNumber(CurrentPlayerNumber), card(CardID),
+		targetPlayerNumber(TargetPlayerNumber), currentPlayerNumber(CurrentPlayerNumber), card(CardID, 0),
 		guessResult(GuessResult), numberOfCardsRecieved(NumberOfCardsRecieved) {}
 
 	int targetPlayerNumber;
