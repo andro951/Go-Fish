@@ -821,7 +821,7 @@ public:
 	/// Gets the 0 through 12 card number which is the index for this cards name in cardDisaplayNames.
 	/// </summary>
     int CardNumber() const {
-        return CardID % CARDS_PER_SUIT;
+        return CardID / SUITS_PER_DECK;
     }
 
 	/// <summary>
@@ -878,7 +878,7 @@ public:
 	Card(const Card& other) : CardID(other.CardID) {}
 
 	static std::string ToString(const Card& card) {
-		return card.FullName() + " (" + std::to_string(card.CardID) + ")";
+		return card.FullName();
 	}
 };
 
@@ -1067,12 +1067,10 @@ bool playerDraw(Player& player, linkedList<Card>& deck, int num = 1) {
     for (int i = 0; i < num; i++) {
 		element<Card>* card = deck.First();
 		player.hand.Emplace(card->value);
-		player.hand.Print("player hand");
 		card->Remove();
     }
 
 	player.hand.Sort();
-	player.hand.Print("player hand after sort");
 
 	return deck.Count() > 0;
 }
@@ -1205,7 +1203,7 @@ void Setup() {
 	int numberOfPlayers = !testing ? get_integer_input_in_range(playersPrimpt, MIN_PLAYERS - 1, MAX_PLAYERS - 1) + 1 : 2;
 	std::cout << std::endl;
 	std::cout << "What is your name?\n";
-	std::string player0Name;
+	std::string player0Name = testing ? "Local Playe" : "";
 	if (!testing)
 		std::cin >> player0Name;
 
@@ -1236,6 +1234,7 @@ void Setup() {
 	std::cout << " " << (numberOfPlayers > 2 ? "have" : "has") << " joined the game.\n\n";
 
 	currentPlayer = players[std::rand() % players.Count()];
+	std::cout << currentPlayer->value.name << " is up first.\n\n";
 
 	deck = createDeck();
 	deck->Shuffle();
