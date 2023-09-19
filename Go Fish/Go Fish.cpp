@@ -6,6 +6,7 @@
 #include <random>
 #include <functional>
 #include <memory>
+#include <chrono>
 
 template<typename T>
 class linkedList;
@@ -15,22 +16,23 @@ class linkedList;
 /// </summary>
 template<typename T>
 struct element {
-	element(const element& other) = delete;
-public:
+	
+	#pragma region Constructos/Properties
+
 	T value;
 	element<T>* nextElement = nullptr;
 	element<T>* previousElement = nullptr;
 	linkedList<T>* list;
 
-	//element(T Value, element* PreviousElement = nullptr, element* NextElement = nullptr) : previousElement(PreviousElement), nextElement(NextElement), value(Value) {}
 	template<typename... Args>
-	//element(Args&&... args) : value(std::forward<Args>(args)...) {}
 	element(linkedList<T>* List, Args&&... args) : list(List), value(std::forward<Args>(args)...) {}
-	
+
 	~element() {
 		BridgeAcross();
 		list->count--;
 	}
+
+	element(const element& other) = delete;
 
 	//element(const element& other) {
 	//	nextElement = other.nextElement;
@@ -38,6 +40,10 @@ public:
 	//	value = other.value;
 	//	list = other.list;
 	//}
+
+	#pragma endregion
+
+	#pragma region Getters/Checks
 
 	T& Next() const {
 		return nextElement->value;
@@ -59,6 +65,20 @@ public:
 		return !IsEnd() && nextElement->IsEnd();
 	}
 
+	template<typename T>
+	static void Inc(element<T>*& el) {
+		el = el->nextElement;
+	}
+
+	template<typename T>
+	static void Dec(element<T>*& el) {
+		el = el->previousElement;
+	}
+
+	#pragma endregion
+
+	#pragma region Insert/Remove
+
 	/// <summary>
 	/// Inserts value just before this element in the list
 	/// </summary>
@@ -66,7 +86,7 @@ public:
 		element<T>* newElement = new element<T>(list, value);
 		newElement->InsertMeBeforeOther(this);
 	}
-	
+
 	/// <summary>
 	/// Emplace value just before this element in the list
 	/// </summary>
@@ -106,6 +126,10 @@ public:
 		BridgeAcross();
 		InsertMeAfterOther(other);
 	}
+
+	#pragma endregion
+
+	#pragma region Manage Links
 
 	void Swap(element<T>& other) {
 		//Store the surrounding elements of this element
@@ -193,7 +217,10 @@ public:
 		}
 	}
 
-public:
+	#pragma endregion
+
+	#pragma region Opperators
+
 	bool operator<(const element<T>& other) const {
 		return value < other.value;
 	}
@@ -218,15 +245,8 @@ public:
 		return value != other.value;
 	}
 
-	template<typename T>
-	static void Inc(element<T>*& el) {
-		el = el->nextElement;
-	}
+	#pragma endregion
 
-	template<typename T>
-	static void Dec(element<T>*& el) {
-		el = el->previousElement;
-	}
 };
 
 /// <summary>
@@ -234,6 +254,10 @@ public:
 /// </summary>
 template<typename T>
 class linkedList {
+private:
+
+	#pragma region Properties
+
 	/// <summary>
 	/// First element of the list which starts as the same as the end element and is changed when the 
 	///		first element is added or when elements are removed/inserted.
@@ -271,11 +295,22 @@ class linkedList {
 
 	linkedList(const linkedList& other) = delete;
 
+	//linkedList(const linkedList& other) {
+	//	//Fatal design flaw, each element tracks the list, so you need to update the list pointer for each element.
+	//	element<T>* current = First();
+	//	while (current != nullptr) {
+	//		current->list = this;
+	//		element<T>::Inc(current);
+	//	}
+	//}
 
 	friend struct element<T>;
+
+	#pragma endregion
 
 public:
-	friend struct element<T>;
+
+	#pragma region Constructors
 
 	/// <summary>
 	/// Initialize the list with no values except the end element.
@@ -302,33 +337,9 @@ public:
 		Add(arr);
 	}
 
-	linkedList(linkedList&& other) noexcept
-		: firstElement(other.firstElement), endElement(other.endElement), count(other.count), sorted(other.sorted), elementToStringFunc(other.elementToStringFunc) {
-		// Reset the source list to a valid state
-		other.firstElement = nullptr;
-		other.endElement = nullptr;
-		other.count = 0;
-		other.sorted = false;
-		other.elementToStringFunc = nullptr;
-	}
+	#pragma endregion
 
-	linkedList& operator=(const linkedList& other) {
-		//Fatal design flaw, each element tracks the list, so you need to update the list pointer for each element.
-		element<T>* current = First();
-		while (current != nullptr) {
-			current->list = this;
-			element<T>::Inc(current);
-		}
-	}
-
-	//linkedList(const linkedList& other) {
-	//	//Fatal design flaw, each element tracks the list, so you need to update the list pointer for each element.
-	//	element<T>* current = First();
-	//	while (current != nullptr) {
-	//		current->list = this;
-	//		element<T>::Inc(current);
-	//	}
-	//}
+	#pragma region Getters
 
 	/// <summary>
 	/// Gets the first element in the list.
@@ -359,6 +370,10 @@ public:
 		return count;
 	}
 
+	#pragma endregion
+
+	#pragma region Adding/Removing
+
 	/// <summary>
 	/// Creates a new element, and adds it to the list.
 	/// </summary>
@@ -374,6 +389,22 @@ public:
 
 		++count;
 	}
+
+	/// <summary>
+	/// Adds all values from the array to the list from [start, end).
+	/// </summary>
+	/// <param name="end">Stops adding elements when start < end.  The value arr[end] is not added.</param>
+	template<size_t S>
+	void Add(const T(&arr)[S], int start = 0, int end = S) {
+		if (end <= start)
+			return;
+
+		//Add each value from [start, end).
+		while (start < end) {
+			Add(arr[start++]);
+		}
+	}
+
 	/// <summary>
 	/// Creates a new element by directly constructing it's value in place, and adds it to the list.
 	/// </summary>
@@ -393,6 +424,18 @@ public:
 	}
 
 	/// <summary>
+	/// Inserts a new element into the list at the current element.
+	/// </summary>
+	void Insert(element<T>* current, const T& value, bool after = false) {
+		if (!after) {
+			current->InsertNewBeforeMe(value);
+		}
+		else {
+			current->InsertNewAfterMe(value);
+		}
+	}
+
+	/// <summary>
 	/// Inserts the value into the list in sorted order.
 	/// </summary>
 	void InsertSort(const T& value) {
@@ -400,30 +443,35 @@ public:
 		current->InsertNewBeforeMe(value);
 	}
 
+	/// <summary>
+	/// Creates a new element by directly constructing it's value in place, and inserts it into the list in sorted order.
+	/// </summary>
 	template<typename... Args>
 	void EmplaceSort(Args&&... args) {
 		element<T>* newElement = new element<T>(this, args...);
 		InsertSort(newElement);
 	}
 
+	/// <summary>
+	/// Inserts the new element into the list in sorted order.
+	/// </summary>
 	void InsertSort(element<T>* newElement) {
 		element<T>* current = FindInsertElement(newElement->value);
 		newElement->InsertMeBeforeOther(current);
 	}
 
 	/// <summary>
-	/// Adds all values from the array to the list from [start, end).
+	/// Removes the current element from the list.
 	/// </summary>
-	/// <param name="end">Stops adding elements when start < end.  The value arr[end] is not added.</param>
-	template<size_t S>
-	void Add(const T(&arr)[S], int start = 0, int end = S) {
-		if (end <= start)
-			return;
+	void Remove(element<T>* current) {
+		current->Remove();
+	}
 
-		//Add each value from [start, end).
-		while (start < end) {
-			Add(arr[start++]);
-		}
+	/// <summary>
+	/// Removes the element at the index.
+	/// </summary>
+	void RemoveAt(int index) {
+		Remove((*this)[index]);
 	}
 
 	/// <summary>
@@ -435,6 +483,10 @@ public:
 			current->previousElement->Remove();
 		}
 	}
+
+	#pragma endregion
+
+	#pragma region Sorting/Finding
 
 	/// <summary>
 	/// Finds the element where the new value/element would be inserted.
@@ -479,40 +531,6 @@ public:
 	}
 
 	/// <summary>
-	/// Checks if the list contains the value.
-	/// </summary>
-	bool Contains(const T& value) {
-		element<T>* current = FindInsertElement(value, false);
-		return current->value == value;
-	}
-
-	/// <summary>
-	/// Inserts a new element into the list at the current element.
-	/// </summary>
-	void Insert(element<T>* current, const T& value, bool after = false) {
-		if (!after) {
-			current->InsertNewBeforeMe(value);
-		}
-		else {
-			current->InsertNewAfterMe(value);
-		}
-	}
-
-	/// <summary>
-	/// Removes the current element from the list.
-	/// </summary>
-	void Remove(element<T>* current) {
-		current->Remove();
-	}
-
-	/// <summary>
-	/// Removes the element at the index.
-	/// </summary>
-	void RemoveAt(int index) {
-		Remove((*this)[index]);
-	}
-
-	/// <summary>
 	/// Gets the value by index.  Should only be used when no elements are already available to use to move through the list.
 	/// </summary>
 	/// <param name="index"></param>
@@ -540,6 +558,14 @@ public:
 	}
 
 	/// <summary>
+	/// Checks if the list contains the value.
+	/// </summary>
+	bool Contains(const T& value) {
+		element<T>* current = FindInsertElement(value, false);
+		return current->value == value;
+	}
+
+	/// <summary>
 	/// Sorts the list using insertion sort.
 	/// </summary>
 	void Sort() {
@@ -561,6 +587,14 @@ public:
 			copy->MoveMeBeforeOther(insertElement);
 		}
 	}
+
+	void Shuffle(int passes = 5) {
+
+	}
+
+	#pragma endregion
+
+	#pragma region ToString
 
 	/// <summary>
 	/// Converts the list to a string.
@@ -620,6 +654,10 @@ public:
 	void Print(std::string label = "", bool reverse = false) const {
 		std::cout << ToString(label, reverse) << std::endl;
 	}
+
+	#pragma endregion
+
+	#pragma region Operators
 
 	bool operator==(const linkedList& other) const {
 		if (count != other.count)
@@ -681,6 +719,29 @@ public:
 	bool operator>=(const linkedList& other) const {
 		return !(*this < other);
 	}
+
+	linkedList& operator=(const linkedList& other) {
+		//Fatal design flaw, each element tracks the list, so you need to update the list pointer for each element.
+		element<T>* current = First();
+		while (current != nullptr) {
+			current->list = this;
+			element<T>::Inc(current);
+		}
+	}
+
+	/// <summary>
+	/// Move assignment operator.
+	/// </summary>
+	linkedList(linkedList&& other) noexcept
+		: firstElement(other.firstElement), endElement(other.endElement), count(other.count), sorted(other.sorted), elementToStringFunc(other.elementToStringFunc) {
+		other.firstElement = nullptr;
+		other.endElement = nullptr;
+		other.count = 0;
+		other.sorted = false;
+		other.elementToStringFunc = nullptr;
+	}
+
+	#pragma endregion
 };
 
 const int DECK_SIZE = 52;
@@ -696,27 +757,38 @@ public:
     Card() : CardID(DECK_SIZE) {}
     Card(int cardID) : CardID(cardID) {}
     Card(int cardNumber, int suit) : CardID(suit* CARDS_PER_SUIT + cardNumber) {}
+
+    /// <summary>
+    /// CardID is a number from 0 to 51 representing a playing card.
+    /// </summary>
     int CardID;
 
+	/// <summary>
+	/// Gets the 0 through 12 card number which is the index for this cards name in cardDisaplayNames.
+	/// </summary>
     int CardNumber() const {
         return CardID % CARDS_PER_SUIT;
     }
 
+	/// <summary>
+	/// Gets the 0 through 3 card suit which is the index for this cards name in suitDisplayNames.
+	/// </summary>
     int Suit() const {
         return CardID % SUITS_PER_DECK;
     }
 
+    /// <summary>
+    /// Get the cards full display name including number and suit.
+    /// </summary>
     std::string Name() const {
         int cardNumber = CardNumber();
         int suit = Suit();
+
+		//Use default name if the card number or suit is out of range.
         std::string numberName = cardNumber >= 0 && cardNumber < CARDS_PER_SUIT ? cardDisaplayNames[cardNumber] : DEFAULT_NUM_NAME;
         std::string suitName = suit >= 0 && suit < SUITS_PER_DECK ? suitDisplayNames[suit] : DEFAULT_SUIT_NAME;
         return numberName + " of " + suitName;
     }
-
-	static std::string ToString(const Card& card) {
-		return card.Name();
-	}
 
 	bool operator==(const Card& other) const {
 		return CardID == other.CardID;
@@ -743,22 +815,25 @@ public:
 	}
 
 	Card(const Card& other) : CardID(other.CardID) {}
+
+	static std::string ToString(const Card& card) {
+		return card.Name();
+	}
 };
 
-typedef std::string(*CardToString)(const Card&);
-CardToString cardToString = [](const Card& card) -> std::string { return card.Name(); };
-
-static int playerCount = 0;
 class Player {
-	Player(const Player& other) = delete;
+	Player(const Player& other) = delete;//Delete copy constructor to prevent copying Player objects.
 public:
 	int playerNumber;
-	Player() : playerNumber(-1), name("Default"), hand(cardToString, true) {}
-	Player(int PlayerNumber) : playerNumber(PlayerNumber), name("Player " + std::to_string(playerNumber)), hand(cardToString, true) {}
-	Player(int PlayerNumber, std::string Name) : playerNumber(PlayerNumber), name(Name), hand(cardToString, true) {}
+	Player() : playerNumber(-1), name("Default"), hand(Card::ToString, true) {}
+	Player(int PlayerNumber) : playerNumber(PlayerNumber), name("Player " + std::to_string(playerNumber)), hand(Card::ToString, true) {}
+	Player(int PlayerNumber, std::string Name) : playerNumber(PlayerNumber), name(Name), hand(Card::ToString, true) {}
 	std::string name;
 	linkedList<Card> hand;
 
+	/// <summary>
+	/// Move constructor used to move a player from one container to another when using std containers.
+	/// </summary>
 	Player(Player&& other) noexcept : playerNumber(std::move(other.playerNumber)), name(std::move(other.name)), hand(std::move(other.hand)) {}
 
 	bool operator==(const Player& other) const {
@@ -818,6 +893,7 @@ std::unique_ptr<linkedList<Card>> createDeck() {
 void shuffleDeck(linkedList<Card>& deck) { //thanks to chatgpt for helping with this function, I had to research the Fisher-Yates algorithm used here
     std::random_device rand;
     std::mt19937 rng(rand());
+
     //shuffle(deck.begin(), deck.end(), rng);
 }
 
