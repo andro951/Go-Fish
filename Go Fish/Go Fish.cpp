@@ -537,7 +537,7 @@ public:
 	/// <param name="goingUp">- true means it will go up the list, false means it will go down the list.</param>
 	/// <returns></returns>
 	element<T>* FindInsertElement(element<T>* start, const T& value, bool after = true) {
-		while (!start->IsLast() && (after && value >= start->value || !after && value > start->value)) {
+		while (!start->IsEnd() && (after && value >= start->value || !after && value > start->value)) {
 			element<T>::Inc(start);
 		}
 
@@ -878,7 +878,7 @@ public:
 	Card(const Card& other) : CardID(other.CardID) {}
 
 	static std::string ToString(const Card& card) {
-		return card.FullName();
+		return card.FullName() + " (" + std::to_string(card.CardID) + ")";
 	}
 };
 
@@ -1071,7 +1071,9 @@ bool playerDraw(Player& player, linkedList<Card>& deck, int num = 1) {
 		card->Remove();
     }
 
-	int temp = deck.Count();
+	player.hand.Sort();
+	player.hand.Print("player hand after sort");
+
 	return deck.Count() > 0;
 }
 
@@ -1191,6 +1193,8 @@ std::string GetPlayerName(int playerNumber) {
 	return players[playerNumber]->value.name;
 }
 
+bool testing = true;
+
 void Setup() {
 	std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
@@ -1198,18 +1202,20 @@ void Setup() {
 	std::cout << "Who's ready for an exciting fame of Go Fish?!\n\n";
 
 	std::string playersPrimpt = "How many NPC players would you like to play with? (1 - 5)";
-	int numberOfPlayers = get_integer_input_in_range(playersPrimpt, MIN_PLAYERS - 1, MAX_PLAYERS - 1) + 1;
+	int numberOfPlayers = !testing ? get_integer_input_in_range(playersPrimpt, MIN_PLAYERS - 1, MAX_PLAYERS - 1) + 1 : 2;
 	std::cout << std::endl;
 	std::cout << "What is your name?\n";
 	std::string player0Name;
-	std::cin >> player0Name;
+	if (!testing)
+		std::cin >> player0Name;
+
 	std::cout << std::endl;
 
 	players.Emplace(0, player0Name);
 	for (int i = 1; i < numberOfPlayers; i++) {
 		players.Emplace(players.Count());
 	}
-
+	
 	bool first = true;
 	for (element<Player>* player = players.First()->nextElement; !player->IsEnd(); element<Player>::Inc(player)) {
 		if (first) {
