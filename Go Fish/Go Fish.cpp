@@ -20,12 +20,12 @@ public:
 	T value;
 	element<T>* nextElement = nullptr;
 	element<T>* previousElement = nullptr;
-	linkedList<T>* list = nullptr;
+	linkedList<T>* list;
 
 	//element(T Value, element* PreviousElement = nullptr, element* NextElement = nullptr) : previousElement(PreviousElement), nextElement(NextElement), value(Value) {}
 	template<typename... Args>
-	element(Args&&... args) : value(std::forward<Args>(args)...) {}
-	//element(Args&&... args, linkedList<T>* List) : list(List) value(std::forward<Args>(args)...) {}
+	//element(Args&&... args) : value(std::forward<Args>(args)...) {}
+	element(linkedList<T>* List, Args&&... args) : list(List), value(std::forward<Args>(args)...) {}
 	
 	~element() {
 		BridgeAcross();
@@ -63,8 +63,7 @@ public:
 	/// Inserts value just before this element in the list
 	/// </summary>
 	void InsertNewBeforeMe(const T& value) {
-		element<T>* newElement = new element<T>(value);
-		newElement->list = list;
+		element<T>* newElement = new element<T>(list, value);
 		newElement->InsertMeBeforeOther(this);
 	}
 	
@@ -73,8 +72,7 @@ public:
 	/// </summary>
 	template<typename... Args>
 	void EmplaceNewBeforeMe(Args&&... args) {
-		element<T>* newElement = new element<T>(args...);
-		newElement->list = list;
+		element<T>* newElement = new element<T>(list, args...);
 		newElement->InsertMeBeforeOther(this);
 	}
 
@@ -82,8 +80,7 @@ public:
 	/// Inserts value just after this element in the list
 	/// </summary>
 	void InsertNewAfterMe(const T& value) {
-		element<T>* newElement = new element<T>(value);
-		newElement->list = list;
+		element<T>* newElement = new element<T>(list, value);
 		newElement->InsertMeAfterOther(this);
 	}
 
@@ -92,8 +89,7 @@ public:
 	/// </summary>
 	template<typename... Args>
 	void EmplaceNewAfterMe(Args&&... args) {
-		element<T>* newElement = new element<T>(args...);
-		newElement->list = list;
+		element<T>* newElement = new element<T>(list, args...);
 		newElement->InsertMeAfterOther(this);
 	}
 
@@ -269,8 +265,7 @@ class linkedList {
 	/// Creates the 
 	/// </summary>
 	void Setup() {
-		endElement = new element<T>();
-		endElement->list = this;
+		endElement = new element<T>(this);
 		firstElement = endElement;
 	}
 
@@ -384,8 +379,7 @@ public:
 	/// </summary>
 	template<typename... Args>
 	void Emplace(Args&&... args) {
-		element<T>* newElement = new element<T>(args...);
-		newElement->list = this;
+		element<T>* newElement = new element<T>(this, args...);
 		if (sorted) {
 			//If the list is already sorted, insert sort the new element.
 			InsertSort(newElement);
@@ -408,8 +402,7 @@ public:
 
 	template<typename... Args>
 	void EmplaceSort(Args&&... args) {
-		element<T>* newElement = new element<T>(args...);
-		newElement->list = this;
+		element<T>* newElement = new element<T>(this, args...);
 		InsertSort(newElement);
 	}
 
