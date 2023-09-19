@@ -384,7 +384,7 @@ public:
 	/// </summary>
 	template<typename... Args>
 	void Emplace(Args&&... args) {
-		element<T>* newElement = new element<T>(std::forward<Args>(args)...);
+		element<T>* newElement = new element<T>(args...);
 		newElement->list = this;
 		if (sorted) {
 			//If the list is already sorted, insert sort the new element.
@@ -408,7 +408,7 @@ public:
 
 	template<typename... Args>
 	void EmplaceSort(Args&&... args) {
-		element<T>* newElement = new element<T>(T(std::forward<Args>(args)...));
+		element<T>* newElement = new element<T>(args...);
 		newElement->list = this;
 		InsertSort(newElement);
 	}
