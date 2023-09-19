@@ -15,7 +15,7 @@ class linkedList;
 /// </summary>
 template<typename T>
 struct element {
-	//element(const element& other) = delete;
+	element(const element& other) = delete;
 public:
 	T value;
 	element<T>* nextElement = nullptr;
@@ -25,18 +25,19 @@ public:
 	//element(T Value, element* PreviousElement = nullptr, element* NextElement = nullptr) : previousElement(PreviousElement), nextElement(NextElement), value(Value) {}
 	template<typename... Args>
 	element(Args&&... args) : value(std::forward<Args>(args)...) {}
+	//element(Args&&... args, linkedList<T>* List) : list(List) value(std::forward<Args>(args)...) {}
 	
 	~element() {
 		BridgeAcross();
 		list->count--;
 	}
 
-	element(const element& other) {
-		nextElement = other.nextElement;
-		previousElement = other.previousElement;
-		value = other.value;
-		list = other.list;
-	}
+	//element(const element& other) {
+	//	nextElement = other.nextElement;
+	//	previousElement = other.previousElement;
+	//	value = other.value;
+	//	list = other.list;
+	//}
 
 	T& Next() const {
 		return nextElement->value;
@@ -273,7 +274,7 @@ class linkedList {
 		firstElement = endElement;
 	}
 
-	//linkedList(const linkedList& other) = delete;
+	linkedList(const linkedList& other) = delete;
 
 
 	friend struct element<T>;
@@ -325,14 +326,14 @@ public:
 		}
 	}
 
-	linkedList(const linkedList& other) {
-		//Fatal design flaw, each element tracks the list, so you need to update the list pointer for each element.
-		element<T>* current = First();
-		while (current != nullptr) {
-			current->list = this;
-			element<T>::Inc(current);
-		}
-	}
+	//linkedList(const linkedList& other) {
+	//	//Fatal design flaw, each element tracks the list, so you need to update the list pointer for each element.
+	//	element<T>* current = First();
+	//	while (current != nullptr) {
+	//		current->list = this;
+	//		element<T>::Inc(current);
+	//	}
+	//}
 
 	/// <summary>
 	/// Gets the first element in the list.
@@ -797,8 +798,6 @@ public:
 };
 
 linkedList<Player> players(Player::ToString);
-//std::vector<Player> players;
-
 
 std::unique_ptr<linkedList<Card>> createDeck() {
 	std::unique_ptr <linkedList<Card>> deck = std::make_unique<linkedList<Card>>(Card::ToString);
@@ -810,17 +809,6 @@ std::unique_ptr<linkedList<Card>> createDeck() {
 
     return deck;
 };
-
-//linkedList<Card> createDeck() {
-//	linkedList<Card> deck(cardToString);
-//	for (int i = 0; i < SUITS_PER_DECK; ++i) {
-//		for (int j = 0; j < CARDS_PER_SUIT; ++j) {
-//			deck.Add(Card(j, i));
-//		}
-//	}
-//
-//	return deck;
-//};
 
 /*
 	using _Diff         = _Iter_diff_t<_RanIt>;
@@ -844,11 +832,8 @@ bool playerDraw(Player& player, linkedList<Card>& deck, int num = 1) {
 	//linkedList<Card>& hand = hands[player.playerNumber]->value;
     for (int i = 0; i < num; i++) {
 		element<Card>* card = deck.First();
-		//hand.Add(Card(card->value));
 		player.hand.Emplace(card->value);
-		player.hand.Print("player.hand count " + std::to_string(player.hand.Count()));
-		//hand.Print("hand count " + std::to_string(hand.Count()));
-		//card->Remove();
+		card->Remove();
     }
 
 	int temp = deck.Count();
@@ -881,43 +866,23 @@ void PrintVector(const std::vector<T>& vec, ElementToStringFunc elementToStringF
 }
 
 int main() {
-	Player player(1);
-	player.hand.Emplace(1, 1);
-	player.hand.Print("hand");
-	player.hand.Print("hand", true);
-
 	std::unique_ptr<linkedList<Card>> deck = createDeck();
 	shuffleDeck(*deck);
 
 	int numberOfPlayers = 4;
 	for (int i = 0; i < numberOfPlayers; i++) {
-		int playerNumber = players.Count();
-		players.Emplace(playerNumber);
-		//players.emplace_back(playerNumber);
+		players.Emplace(players.Count());
 	}
-
-	//linkedList<Card> player1Hand(cardToString);
-	//element<Card>* card = deck.First();
-	//player1Hand.Add(Card(card->value));
-	//card->Remove();
-	//player1Hand.Print("Player1Hand");
 
 	for (element<Player>* player = players.First(); !player->IsEnd(); element<Player>::Inc(player)) {
-		player->value.hand.Emplace(1, 1);
-		player->value.hand.Print("player.hand count " + std::to_string(player->value.hand.Count()));
+		playerDraw(player->value, *deck, 5);
 	}
 
-	//Draw cards
-	//for (Player& player : players) {
- //       playerDraw(player, *deck, 5);
-	//	player.hand.Print(player.name + std::to_string(player.hand.Count()));
-	//	player.hand.Print(player.name + std::to_string(player.hand.Count()), true);
- //   }
+	for (element<Player>* player = players.First(); !player->IsEnd(); element<Player>::Inc(player)) {
+		player->value.hand.Print(player->value.name + " hand (" + std::to_string(player->value.hand.Count()) + ")");
+	}
 
-	//Print hands
-  //  for (const Player& player : players) {
-		//player.hand.Print(player.name);
-  //  }
+	std::cout << std::endl;
 
 	deck->Print("Deck");
 
