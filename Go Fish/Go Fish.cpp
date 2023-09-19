@@ -1181,6 +1181,18 @@ int get_option(const std::vector<std::string>& option_list) {
 	return get_integer_input_in_range(prompt, 1, option_list.size()) - 1;
 }
 
+template<size_t S>
+int get_option(const std::string(&option_list)[S]) {
+	// List of all options with number labels
+	std::vector<std::string> options;
+	for (int i = 0; i < S; i++) {
+		options.push_back(std::to_string(i + 1) + ". " + option_list[i]);
+	}
+
+	std::string prompt = join(options) + "\n";
+	return get_integer_input_in_range(prompt, 1, S) - 1;
+}
+
 #pragma endregion
 
 /// <summary>
@@ -1203,7 +1215,7 @@ void Setup() {
 	int numberOfPlayers = !testing ? get_integer_input_in_range(playersPrimpt, MIN_PLAYERS - 1, MAX_PLAYERS - 1) + 1 : 2;
 	std::cout << std::endl;
 	std::cout << "What is your name?\n";
-	std::string player0Name = testing ? "Local Playe" : "";
+	std::string player0Name = testing ? "Local Player" : "";
 	if (!testing)
 		std::cin >> player0Name;
 
@@ -1335,12 +1347,16 @@ void PrintLastRoundOfGuesses() {
 }
 
 Guess GetPlayerGuess() {
-	std::string prompt = "What player would you like to guess? (2 - " + std::to_string(players.Count()) + ")";
-	int targetPlayerNumber = get_integer_input_in_range(prompt, 2, players.Count()) - 1;
-	std::cout << std::endl;
+	int targetPlayerNumber = 1;
+	if (players.Count() > 2) {
+		std::string prompt = "What player would you like to guess? (2 - " + std::to_string(players.Count()) + ")";
+		int targetPlayerNumber = get_integer_input_in_range(prompt, 2, players.Count()) - 1;
+		std::cout << std::endl;
+	}
 
-	prompt = "What card would you like to guess? (1 - " + std::to_string(CARDS_PER_SUIT) + ")";
-	int cardNumber = get_integer_input_in_range(prompt, 1, CARDS_PER_SUIT) - 1;
+	std::string cardPrompt = "What card would you like to guess?";
+	std::cout << cardPrompt << std::endl;
+	int cardNumber = get_option(cardDisaplayNames);
 	std::cout << std::endl;
 
 	return Guess(targetPlayerNumber, currentPlayer->value.playerNumber, cardNumber);
