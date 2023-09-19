@@ -4,152 +4,576 @@
 #include <random>
 #include <algorithm>
 #include <random>
+#include <functional>
+#include <memory>
 
 template<typename T>
 class linkedList;
 
+/// <summary>
+/// element acts as a container for a value in a linkedList that stores the value and pointers to the surrounding elements and the list.
+/// </summary>
 template<typename T>
 struct element {
+	//element(const element& other) = delete;
 public:
-	element(T Value, linkedList<T>* List, element* PreviousElement = nullptr, element* NextElement = nullptr) : value(Value), list(List), previousElement(PreviousElement), nextElement(NextElement) {}
-
 	T value;
-	element<T>* nextElement;
-	element<T>* previousElement;
-	linkedList<T>* list;
+	element<T>* nextElement = nullptr;
+	element<T>* previousElement = nullptr;
+	linkedList<T>* list = nullptr;
 
-	void InsertValueBeforeMe(const T& value) {
-		element<T>* newElement = new element<T>(value, list);
-		newElement->LetMeInBefore(this);
+	//element(T Value, element* PreviousElement = nullptr, element* NextElement = nullptr) : previousElement(PreviousElement), nextElement(NextElement), value(Value) {}
+	template<typename... Args>
+	element(Args&&... args) : value(std::forward<Args>(args)...) {}
+	
+	~element() {
+		BridgeAcross();
+		list->count--;
 	}
 
-	void InsertValueAfterMe(const T& value) {
-		element<T>* newElement = new element<T>(value, list);
-		newElement->LetMeInAfter(this);
+	element(const element& other) {
+		nextElement = other.nextElement;
+		previousElement = other.previousElement;
+		value = other.value;
+		list = other.list;
 	}
 
-private:
-	void BridgeAcrossMe() {
-		if (previousElement == nullptr) {
-			//I'm the first element
-			list->firstElement = nextElement;
-			nextElement->previousElement = nullptr;
-		}
-		else {
-			previousElement->nextElement = nextElement;
-			nextElement->previousElement = previousElement;
-		}
+	T& Next() const {
+		return nextElement->value;
 	}
 
-	void LetMeInBefore(element<T>* other) {
-		if (other->previousElement == nullptr) {
-			//Other is the first element
+	T& Prev() const {
+		return previousElement->value;
+	}
+
+	bool IsFirst() const {
+		return previousElement == nullptr;
+	}
+
+	bool IsEnd() const {
+		return nextElement == nullptr;
+	}
+
+	bool IsLast() const {
+		return !IsEnd() && nextElement->IsEnd();
+	}
+
+	/// <summary>
+	/// Inserts value just before this element in the list
+	/// </summary>
+	void InsertNewBeforeMe(const T& value) {
+		element<T>* newElement = new element<T>(value);
+		newElement->list = list;
+		newElement->InsertMeBeforeOther(this);
+	}
+	
+	/// <summary>
+	/// Emplace value just before this element in the list
+	/// </summary>
+	template<typename... Args>
+	void EmplaceNewBeforeMe(Args&&... args) {
+		element<T>* newElement = new element<T>(args...);
+		newElement->list = list;
+		newElement->InsertMeBeforeOther(this);
+	}
+
+	/// <summary>
+	/// Inserts value just after this element in the list
+	/// </summary>
+	void InsertNewAfterMe(const T& value) {
+		element<T>* newElement = new element<T>(value);
+		newElement->list = list;
+		newElement->InsertMeAfterOther(this);
+	}
+
+	/// <summary>
+	/// Emplace value after before this element in the list
+	/// </summary>
+	template<typename... Args>
+	void EmplaceNewAfterMe(Args&&... args) {
+		element<T>* newElement = new element<T>(args...);
+		newElement->list = list;
+		newElement->InsertMeAfterOther(this);
+	}
+
+	void Remove() {
+		delete this;
+	}
+
+	void MoveMeBeforeOther(element<T>* other) {
+		BridgeAcross();
+		InsertMeBeforeOther(other);
+	}
+
+	void MoveMeAfterOther(element<T>* other) {
+		BridgeAcross();
+		InsertMeAfterOther(other);
+	}
+
+	void Swap(element<T>& other) {
+		//Store the surrounding elements of this element
+		element<T>* tempPrevious = previousElement;
+		element<T>* tempNext = nextElement;
+
+		//Connect this Element to the surrounding elements of other
+		previousElement = other.previousElement;
+		nextElement = other.nextElement;
+
+		//Connect other to the surrounding elements of this element
+		other.previousElement = tempPrevious;
+		other.nextElement = tempNext;
+	}
+
+	/// <summary>
+	/// Connects this element to the surrounding elements, then connects the surrounding elements to this element.
+	/// Used when inserting or moving an element.
+	/// </summary>
+	void InsertMeBeforeOther(element<T>* other) {
+		if (other->IsFirst()) {
+			//other is the first element
+
+			//Connect other and the list to this element
 			previousElement = nullptr;
 			nextElement = other;
+
+			//Connect this element to the list and other
 			list->firstElement = this;
 			other->previousElement = this;
 		}
 		else {
+			//other is not the first element
+
+			//Connect surrounding elements to this element
 			previousElement = other->previousElement;
 			nextElement = other;
+
+			//Connect this element to surrounding elements
 			other->previousElement = this;
 			previousElement->nextElement = this;
 		}
 	}
 
-	void LetMeInAfter(element<T>* other) {
-		if (other->nextElement == nullptr) {
-			//Other is the last element, not allowed to move the last element
-			LetMeInBefore(other);
+	/// <summary>
+	/// Connects this element to the surrounding elements, then connects the surrounding elements to this element.
+	/// Used when inserting or moving an element.
+	/// </summary>
+	void InsertMeAfterOther(element<T>* other) {
+		if (other->IsEnd()) {
+			//Other is the end element, not allowed to move the end element, so insert before it instead.
+			InsertMeBeforeOther(other);
 		}
 		else {
+			//other is not the end element
+
+			//Connect surrounding elements to this element
 			previousElement = other;
 			nextElement = other->nextElement;
+
+			//Connect this element to surrounding elements
 			other->nextElement = this;
 			nextElement->previousElement = this;
 		}
 	}
 
+	/// <summary>
+	/// Connects the previous and next elements from the surrounding elements together.
+	/// Used when removing or moving an element.
+	/// </summary>
+	void BridgeAcross() {
+		if (IsFirst()) {
+			//This element is the first element
+
+			//Connect the list to the next element
+			list->firstElement = nextElement;
+			nextElement->previousElement = nullptr;
+		}
+		else {
+			//This element is not the first element
+
+			//Connect the previous and next elements together
+			previousElement->nextElement = nextElement;
+			nextElement->previousElement = previousElement;
+		}
+	}
+
 public:
-	void RemoveMe() {
-		BridgeAcrossMe();
-		delete this;
+	bool operator<(const element<T>& other) const {
+		return value < other.value;
 	}
 
-	void Swap(element<T>& other) {
-		element<T>* tempPrevious = previousElement;
-		element<T>* tempNext = nextElement;
-		previousElement = other.previousElement;
-		nextElement = other.nextElement;
-		other.previousElement = tempPrevious;
-		other.nextElement = tempNext;
+	bool operator>(const element<T>& other) const {
+		return value > other.value;
 	}
 
-	void MoveToBefore(element<T>* other) {
-		BridgeAcrossMe();
-		LetMeInBefore(other);
+	bool operator<=(const element<T>& other) const {
+		return value <= other.value;
 	}
 
-	void MoveToAfter(element<T>* other) {
-		BridgeAcrossMe();
-		LetMeInAfter(other);
+	bool operator>=(const element<T>& other) const {
+		return value >= other.value;
+	}
+
+	bool operator==(const element<T>& other) const {
+		return value == other.value;
+	}
+
+	bool operator!=(const element<T>& other) const {
+		return value != other.value;
+	}
+
+	template<typename T>
+	static void Inc(element<T>*& el) {
+		el = el->nextElement;
+	}
+
+	template<typename T>
+	static void Dec(element<T>*& el) {
+		el = el->previousElement;
 	}
 };
 
+/// <summary>
+/// linkedList uses elements of "element" to store values.
+/// </summary>
 template<typename T>
 class linkedList {
+	/// <summary>
+	/// First element of the list which starts as the same as the end element and is changed when the 
+	///		first element is added or when elements are removed/inserted.
+	/// </summary>
 	element<T>* firstElement;
-	element<T>* lastElement;//Last element is a dummy element to help with knowing where the end is.  It should always be the last element.
+
+	/// <summary>
+	/// End element is a dummy element to help with knowing where the end is and inserting new elements.<br/>
+	/// It should always be the end element.
+	/// </summary>
+	element<T>* endElement;
+
+	/// <summary>
+	/// Number of elements in the list, not including the end element.
+	/// </summary>
 	int count = 0;
+
+	/// <summary>
+	/// If sorted is true, adding elements will automatically sort them.
+	/// Otherwise, they will be added to the end of the list.
+	/// </summary>
 	bool sorted = false;
 
-	void Setup(bool sort = true) {
-		lastElement = new element<T>(T(), this, nullptr, nullptr);
-		firstElement = lastElement;
-		if (sort)
-			Sort();
+	typedef std::string(*ToStringFunc)(const T&);
+	static std::string ElementToStringFuncDefault(const T& value) { return ""; }
+	ToStringFunc elementToStringFunc;
+
+	/// <summary>
+	/// Creates the 
+	/// </summary>
+	void Setup() {
+		endElement = new element<T>();
+		endElement->list = this;
+		firstElement = endElement;
 	}
+
+	//linkedList(const linkedList& other) = delete;
+
+
+	friend struct element<T>;
 
 public:
 	friend struct element<T>;
-	linkedList(bool sort = false) {
-		Setup(sort);
+
+	/// <summary>
+	/// Initialize the list with no values except the end element.
+	/// </summary>
+	/// <param name="sort"></param>
+	linkedList(ToStringFunc ElementToStringFunc = ElementToStringFuncDefault, bool sort = false) : elementToStringFunc(ElementToStringFunc), sorted(sort) {
+		Setup();
 	}
 
-	linkedList(const T& value, bool sort = false) {
-		Setup(sort);
+	/// <summary>
+	/// Initialize the list with value as the first value.
+	/// </summary>
+	linkedList(const T& value, ToStringFunc ElementToStringFunc = ElementToStringFuncDefault, bool sort = false) : elementToStringFunc(ElementToStringFunc), sorted(sort) {
+		Setup();
 		Add(value);
 	}
 
+	/// <summary>
+	/// Initialize the list, then add all values from the array to the list.
+	/// </summary>
 	template<size_t S>
-	linkedList(const T(&arr)[S], bool sort = false) {
-		Setup(sort);
-
+	linkedList(const T(&arr)[S], ToStringFunc ElementToStringFunc = ElementToStringFuncDefault, bool sort = false) : elementToStringFunc(ElementToStringFunc), sorted(sort) {
+		Setup();
 		Add(arr);
 	}
 
+	linkedList(linkedList&& other) noexcept
+		: firstElement(other.firstElement), endElement(other.endElement), count(other.count), sorted(other.sorted), elementToStringFunc(other.elementToStringFunc) {
+		// Reset the source list to a valid state
+		other.firstElement = nullptr;
+		other.endElement = nullptr;
+		other.count = 0;
+		other.sorted = false;
+		other.elementToStringFunc = nullptr;
+	}
+
+	linkedList& operator=(const linkedList& other) {
+		//Fatal design flaw, each element tracks the list, so you need to update the list pointer for each element.
+		element<T>* current = First();
+		while (current != nullptr) {
+			current->list = this;
+			element<T>::Inc(current);
+		}
+	}
+
+	linkedList(const linkedList& other) {
+		//Fatal design flaw, each element tracks the list, so you need to update the list pointer for each element.
+		element<T>* current = First();
+		while (current != nullptr) {
+			current->list = this;
+			element<T>::Inc(current);
+		}
+	}
+
+	/// <summary>
+	/// Gets the first element in the list.
+	/// </summary>
+	element<T>* First() const {
+		return firstElement;
+	}
+
+	/// <summary>
+	/// Gets the last element in the list.  Equivalent of count - 1 if indexing.
+	/// </summary>
+	element<T>* Last() const {
+		return endElement->previousElement;
+	}
+
+	/// <summary>
+	/// Gets the end element.
+	/// The endElelment should only be used for checking if the end of the list has been reached or inserting elements before it.
+	/// </summary>
+	element<T>* End() const {
+		return endElement;
+	}
+
+	/// <summary>
+	/// Gets the number of elements in the list, not including the end element.
+	/// </summary>
 	int Count() {
 		return count;
 	}
 
+	/// <summary>
+	/// Creates a new element, and adds it to the list.
+	/// </summary>
+	void Add(const T value) {
+		if (sorted) {
+			//If the list is already sorted, insert sort the new element.
+			InsertSort(value);
+		}
+		else {
+			//If not sorted, add the new element to the end of the list.
+			endElement->InsertNewBeforeMe(value);
+		}
+
+		++count;
+	}
+	/// <summary>
+	/// Creates a new element by directly constructing it's value in place, and adds it to the list.
+	/// </summary>
+	template<typename... Args>
+	void Emplace(Args&&... args) {
+		element<T>* newElement = new element<T>(std::forward<Args>(args)...);
+		newElement->list = this;
+		if (sorted) {
+			//If the list is already sorted, insert sort the new element.
+			InsertSort(newElement);
+		}
+		else {
+			//If not sorted, add the new element to the end of the list.
+			newElement->InsertMeBeforeOther(endElement);
+		}
+
+		++count;
+	}
+
+	/// <summary>
+	/// Inserts the value into the list in sorted order.
+	/// </summary>
+	void InsertSort(const T& value) {
+		element<T>* current = FindInsertElement(value);
+		current->InsertNewBeforeMe(value);
+	}
+
+	template<typename... Args>
+	void EmplaceSort(Args&&... args) {
+		element<T>* newElement = new element<T>(T(std::forward<Args>(args)...));
+		newElement->list = this;
+		InsertSort(newElement);
+	}
+
+	void InsertSort(element<T>* newElement) {
+		element<T>* current = FindInsertElement(newElement->value);
+		newElement->InsertMeBeforeOther(current);
+	}
+
+	/// <summary>
+	/// Adds all values from the array to the list from [start, end).
+	/// </summary>
+	/// <param name="end">Stops adding elements when start < end.  The value arr[end] is not added.</param>
 	template<size_t S>
-	void Add(const T(&arr)[S], int start = 0, int endNotIncluded = S) {
-		if (endNotIncluded <= start)
+	void Add(const T(&arr)[S], int start = 0, int end = S) {
+		if (end <= start)
 			return;
 
-		while (start < endNotIncluded) {
+		//Add each value from [start, end).
+		while (start < end) {
 			Add(arr[start++]);
 		}
 	}
 
-	void Add(const T& value) {
-		element<T>* newElement = new element<T>(value, this);
-		lastElement->InsertValueBeforeMe(value);
-		++count;
+	/// <summary>
+	/// Deletes all elements in the list, except the end element.
+	/// </summary>
+	void Clear() {
+		element<T>* current = End();
+		while (!current->IsFirst()) {
+			current->previousElement->Remove();
+		}
 	}
 
-	template<typename ElementToStringFunc>
-	std::string ToString(ElementToStringFunc elementToStringFunc, std::string label = "", bool reverse = false) const {
+	/// <summary>
+	/// Finds the element where the new value/element would be inserted.
+	/// Should be used when adding new elements to a sorted list.
+	/// </summary>
+	/// <param name="after">Only used when values in the list are equal to the value being searched.
+	/// If true, the resulting element will occur just after an element with the same value.
+	/// If false, it will be before the last element of the same value.</param>
+	element<T>* FindInsertElement(const T& value, bool after = true) {
+		element<T>* startElement = First();
+		return FindInsertElement(startElement, value, after);
+	}
+
+	/// <summary>
+	/// Finds the element where the new value/element would be inserted.
+	/// </summary>
+	/// <param name="after">- Only matters if there are duplicates in a list or if value is equal to an element in the list.
+	/// after being true will continue to pass elements of the same value, putting it after the existing ones.
+	/// after being false will stop at the first element of the same value, putting it before the existing ones.</param>
+	/// <param name="goingUp">- true means it will go up the list, false means it will go down the list.</param>
+	/// <returns></returns>
+	element<T>* FindInsertElement(element<T>* start, const T& value, bool after = true) {
+		while (!start->IsLast() && (after && value >= start->value || !after && value > start->value)) {
+			element<T>::Inc(start);
+		}
+
+		return start;
+	}
+
+	/// <summary>
+	/// Finds the element where the new value would be inserted by going backwards through the list.
+	/// </summary>
+	/// <param name="after">- Only matters if there are duplicates in a list or if value is equal to an element in the list.
+	/// after being true will continue to pass elements of the same value, putting it after the existing ones.
+	/// after being false will stop at the first element of the same value, putting it before the existing ones.</param>
+	element<T>* FindInsertElementReverse(element<T>* start, const T& value, bool after = true) {
+		while (!start->IsFirst() && (after && value < start->Prev() || !after && value <= start->Prev())) {
+			element<T>::Dec(start);
+		}
+
+		return start;
+	}
+
+	/// <summary>
+	/// Checks if the list contains the value.
+	/// </summary>
+	bool Contains(const T& value) {
+		element<T>* current = FindInsertElement(value, false);
+		return current->value == value;
+	}
+
+	/// <summary>
+	/// Inserts a new element into the list at the current element.
+	/// </summary>
+	void Insert(element<T>* current, const T& value, bool after = false) {
+		if (!after) {
+			current->InsertNewBeforeMe(value);
+		}
+		else {
+			current->InsertNewAfterMe(value);
+		}
+	}
+
+	/// <summary>
+	/// Removes the current element from the list.
+	/// </summary>
+	void Remove(element<T>* current) {
+		current->Remove();
+	}
+
+	/// <summary>
+	/// Removes the element at the index.
+	/// </summary>
+	void RemoveAt(int index) {
+		Remove((*this)[index]);
+	}
+
+	/// <summary>
+	/// Gets the value by index.  Should only be used when no elements are already available to use to move through the list.
+	/// </summary>
+	/// <param name="index"></param>
+	/// <returns></returns>
+	element<T>* operator[](int index) {
+		if (index < 0 || index >= count)
+			throw std::out_of_range("Index out of range. index: " + std::to_string(index) + ", count: " + std::to_string(count));
+
+		if (index <= count / 2) {
+			element<T>* current = First();
+			while (index-- > 0) {
+				element<T>::Inc(current);
+			}
+
+			return current;
+		}
+		else {
+			element<T>* current = End();
+			while (index++ < count) {
+				element<T>::Dec(current);
+			}
+
+			return current;
+		}
+	}
+
+	/// <summary>
+	/// Sorts the list using insertion sort.
+	/// </summary>
+	void Sort() {
+		//Once sorted, it will stay sorted.
+		if (sorted)
+			return;
+
+		sorted = true;
+
+		element<T>* current = First();
+		element<T>::Inc(current);
+		while (!current->IsEnd()) {
+			element<T>* insertElement = FindInsertElementReverse(current, current->value);
+			element<T>* copy = current;
+			element<T>::Inc(current);
+			if (insertElement == copy)
+				continue;//Already in the right place.
+
+			copy->MoveMeBeforeOther(insertElement);
+		}
+	}
+
+	/// <summary>
+	/// Converts the list to a string.
+	/// </summary>
+	/// <param name="label">- label is printed before the string if included.</param>
+	/// <param name="reverse">- For testing to make sure the list can be traversed backwards.</param>
+	std::string ToString(std::string label = "", bool reverse = false) const {
 		bool first = true;
 		std::string result = "";
 		if (label != "") {
@@ -175,7 +599,7 @@ public:
 			}
 		}
 		else {
-			for (element<T>* current = lastElement->previousElement; current != nullptr; current = current->previousElement) {
+			for (element<T>* current = endElement->previousElement; current != nullptr; current = current->previousElement) {
 				if (first) {
 					first = false;
 				}
@@ -192,175 +616,76 @@ public:
 		return result;
 	}
 
-	template<typename ElementToStringFunc>
-	void Print(ElementToStringFunc elementToStringFunc, std::string label = "", bool reverse = false) const {
-		std::cout << ToString(elementToStringFunc, label, reverse) << std::endl;
-	}
-
-	element<T>* operator[](int index) {
-		if (index < 0 || index >= count)
-			throw std::out_of_range("Index out of range. index: " + std::to_string(index) + ", count: " + std::to_string(count));
-
-		if (index <= count / 2) {
-			element<T>* current = firstElement;
-			while (--index > -1) {
-				current = current->nextElement;
-			}
-
-			return current;
-		}
-		else {
-			element<T>* current = lastElement;
-			int end = count + 1;
-			while (++index < end) {
-				current = current->previousElement;
-			}
-
-			return current;
-		}
-	}
-
-	element<T>* FindInsertElementByIndex(int start, const T& value, bool after = true) {
-		element<T>* startElement = (*this)[start];
-		bool goingUp = after && value >= startElement->value || !after && value > startElement->value;
-
-		return FindInsertElement(startElement, value, goingUp, after);
+	static std::string ToString(const linkedList<T>& list) {
+		return list.ToString();
 	}
 
 	/// <summary>
-	/// Finds the element where the new value/element would be inserted.
-	/// goindUp: true means it will go up the list, false means it will go down the list.
-	/// after: Only matters if there are duplicates in a list or if value is equal to an element in the list.
-	/// after being true will continue to pass elements of the same value, putting it after the existing ones.
-	/// after being false will stop at the first element of the same value, putting it before the existing ones.
+	/// Prints the list to the console.
 	/// </summary>
-	element<T>* FindInsertElement(element<T>* start, const T& value, bool goingUp = true, bool after = true) {
-		if (goingUp) {
-			if (after) {
-				while (start->nextElement != nullptr && value >= start->value) {
-					start = start->nextElement;
-				}
-			}
-			else {
-				while (start->nextElement != nullptr && value > start->value) {
-					start = start->nextElement;
-				}
-			}
-		}
-		else {
-			if (after) {
-				while (start->previousElement != nullptr && value < start->previousElement->value) {
-					start = start->previousElement;
-				}
-			}
-			else {
-				while (start->previousElement != nullptr && value <= start->previousElement->value) {
-					start = start->previousElement;
-				}
-			}
-		}
-
-		return start;
+	void Print(std::string label = "", bool reverse = false) const {
+		std::cout << ToString(label, reverse) << std::endl;
 	}
 
-	bool Find(const T& value, bool firstInstance = true) {
-		element<T>* current = FindInsertElementByIndex(0, value, firstInstance);
-		if (firstInstance) {
-			bool found = current != nullptr && current->previousElement != nullptr && current->previousElement->value == value;
-			if (!found && current->previousElement != nullptr)
-				current = current->previousElement;
+	bool operator==(const linkedList& other) const {
+		if (count != other.count)
+			return false;
 
-			return found;
+		element<T>* current = firstElement;
+		element<T>* otherCurrent = other.firstElement;
+		for (; current->nextElement != nullptr && otherCurrent->nextElement != nullptr;
+			current = current->nextElement, otherCurrent = otherCurrent->nextElement) {
+			if (current->value != otherCurrent->value)
+				return false;
 		}
-		else {
-			return current->value == value;
-		}
+
+		return true;
 	}
 
-	void Insert(int index, const T& value, bool after = false) {
-		Insert((*this)[index], value, after);
+	bool operator!=(const linkedList& other) const {
+		return !(*this == other);
 	}
 
-	void Insert(element<T>* current, const T& value, bool after = false) {
-		if (!after) {
-			current->InsertValueBeforeMe(value);
+	bool operator<(const linkedList& other) const {
+		element<T>* current = firstElement;
+		element<T>* otherCurrent = other.firstElement;
+		for (; current != nullptr; current = current->nextElement, otherCurrent = otherCurrent->nextElement) {
+			if (otherCurrent == nullptr)
+				return false;
+
+			if (current->value < otherCurrent->value)
+				return true;
+
+			else if (current->value > otherCurrent->value)
+				return false;
 		}
-		else {
-			current->InsertValueAfterMe(value);
-		}
+
+		return otherCurrent != nullptr;
 	}
 
-	void Remove(element<T>* current) {
-		current->RemoveMe();
+	bool operator>(const linkedList& other) const {
+		element<T>* current = firstElement;
+		element<T>* otherCurrent = other.firstElement;
+		for (; current != nullptr; current = current->nextElement, otherCurrent = otherCurrent->nextElement) {
+			if (otherCurrent == nullptr)
+				return true;
+
+			if (current->value > otherCurrent->value)
+				return true;
+
+			else if (current->value < otherCurrent->value)
+				return false;
+		}
+
+		return false;
 	}
 
-	void RemoveAt(int index) {
-		Remove((*this)[index]);
+	bool operator<=(const linkedList& other) const {
+		return !(*this > other);
 	}
 
-	void Sort() {
-		sorted = true;
-
-		element<T>* current = firstElement->nextElement;
-		for (; current->nextElement != nullptr;) {
-			element<T>* insertElement = FindInsertElement(current, current->value, false, true);
-			T& currentValue = current->value;
-			T& insertValue = insertElement->value;
-			element<T>* copy = current;
-			current = current->nextElement;
-			if (insertElement == copy)
-				continue;//Already in the right place.
-
-			copy->MoveToBefore(insertElement);
-		}
-	}
-
-	void TryFindPrintResult(const T& value, bool firstInstance = true) {
-		bool found = Find(value, firstInstance);
-		if (found) {
-			std::cout << "Found " << value << std::endl;
-		}
-		else {
-			std::cout << value << " not found." << std::endl;
-		}
-	}
-
-	template<typename ElementToStringFunc, size_t S>
-	void SortAndTryFindPrintResults(const T(&valuesToFind)[S], ElementToStringFunc elementToStringFunc, bool firstInstance = true) {
-		std::string name = "Unsorted";
-		Print(elementToStringFunc, name);
-		Print(elementToStringFunc, name, true);
-
-		bool first = true;
-		for (int i = 0; i < count; ++i) {
-			if (first) {
-				first = false;
-			}
-			else {
-				std::cout << ", ";
-			}
-
-			std::cout << i << ": " << (*this)[i]->value;
-		}
-
-		std::cout << std::endl;
-
-		Sort();
-		name = "Sorted";
-		Print(elementToStringFunc, name);
-		Print(elementToStringFunc, name, true);
-		for (const auto& value : valuesToFind) {
-			TryFindPrintResult(value, firstInstance);
-		}
-
-		std::cout << std::endl;
-	}
-
-	void Clear() {
-		element<T>* current = lastElement;
-		while (current->previousElement != nullptr) {
-			current->previousElement->RemoveMe();
-		}
+	bool operator>=(const linkedList& other) const {
+		return !(*this < other);
 	}
 };
 
@@ -394,19 +719,108 @@ public:
         std::string suitName = suit >= 0 && suit < SUITS_PER_DECK ? suitDisplayNames[suit] : DEFAULT_SUIT_NAME;
         return numberName + " of " + suitName;
     }
+
+	static std::string ToString(const Card& card) {
+		return card.Name();
+	}
+
+	bool operator==(const Card& other) const {
+		return CardID == other.CardID;
+	}
+
+	bool operator!=(const Card& other) const {
+		return !(*this == other);
+	}
+
+	bool operator<(const Card& other) const {
+		return CardID < other.CardID;
+	}
+
+	bool operator>(const Card& other) const {
+		return CardID > other.CardID;
+	}
+
+	bool operator<=(const Card& other) const {
+		return CardID <= other.CardID;
+	}
+
+	bool operator>=(const Card& other) const {
+		return CardID >= other.CardID;
+	}
+
+	Card(const Card& other) : CardID(other.CardID) {}
 };
 
-std::vector<Card> createDeck() {
-    std::vector<Card> deck;
+typedef std::string(*CardToString)(const Card&);
+CardToString cardToString = [](const Card& card) -> std::string { return card.Name(); };
+
+static int playerCount = 0;
+class Player {
+	Player(const Player& other) = delete;
+public:
+	int playerNumber;
+	Player() : playerNumber(-1), name("Default"), hand(cardToString, true) {}
+	Player(int PlayerNumber) : playerNumber(PlayerNumber), name("Player " + std::to_string(playerNumber)), hand(cardToString, true) {}
+	Player(int PlayerNumber, std::string Name) : playerNumber(PlayerNumber), name(Name), hand(cardToString, true) {}
+	std::string name;
+	linkedList<Card> hand;
+
+	Player(Player&& other) noexcept : playerNumber(std::move(other.playerNumber)), name(std::move(other.name)), hand(std::move(other.hand)) {}
+
+	bool operator==(const Player& other) const {
+		return playerNumber == other.playerNumber;
+	}
+
+	bool operator!=(const Player& other) const {
+		return !(*this == other);
+	}
+
+	bool operator<(const Player& other) const {
+		return playerNumber < other.playerNumber;
+	}
+
+	bool operator>(const Player& other) const {
+		return playerNumber > other.playerNumber;
+	}
+
+	bool operator<=(const Player& other) const {
+		return playerNumber <= other.playerNumber;
+	}
+
+	bool operator>=(const Player& other) const {
+		return playerNumber >= other.playerNumber;
+	}
+
+	static std::string ToString(const Player& player) {
+		return player.name;
+	}
+};
+
+linkedList<Player> players(Player::ToString);
+//std::vector<Player> players;
+
+
+std::unique_ptr<linkedList<Card>> createDeck() {
+	std::unique_ptr <linkedList<Card>> deck = std::make_unique<linkedList<Card>>(Card::ToString);
     for (int i = 0; i < SUITS_PER_DECK; ++i) {
         for (int j = 0; j < CARDS_PER_SUIT; ++j) {
-            deck.push_back(Card(j, i));
+            deck->Emplace(j, i);
         }
     }
 
     return deck;
 };
 
+//linkedList<Card> createDeck() {
+//	linkedList<Card> deck(cardToString);
+//	for (int i = 0; i < SUITS_PER_DECK; ++i) {
+//		for (int j = 0; j < CARDS_PER_SUIT; ++j) {
+//			deck.Add(Card(j, i));
+//		}
+//	}
+//
+//	return deck;
+//};
 
 /*
 	using _Diff         = _Iter_diff_t<_RanIt>;
@@ -420,25 +834,25 @@ std::vector<Card> createDeck() {
 		}
 	}
 */
-void shuffleDeck(std::vector<Card>& deck) { //thanks to chatgpt for helping with this function, I had to research the Fisher-Yates algorithm used here
+void shuffleDeck(linkedList<Card>& deck) { //thanks to chatgpt for helping with this function, I had to research the Fisher-Yates algorithm used here
     std::random_device rand;
     std::mt19937 rng(rand());
     //shuffle(deck.begin(), deck.end(), rng);
 }
 
-struct Player { //create our player structure
-    std::string name; //name of the player
-    std::vector<Card> hand; //players hand of cards
-    int points = 0; //number of points initialized at zero
-} cpu1, cpu2, cpu3, cpu4; //computer players
-
-std::vector<Player> players = { cpu1, cpu2, cpu3, cpu4 };
-
-void playerDraw(Player& player, std::vector<Card>& deck) {
-    for (int i = 0; i < 5; i++) {
-        player.hand.push_back(deck.back()); //adds the last card in the deck to the hand
-        deck.pop_back(); //removes said card
+bool playerDraw(Player& player, linkedList<Card>& deck, int num = 1) {
+	//linkedList<Card>& hand = hands[player.playerNumber]->value;
+    for (int i = 0; i < num; i++) {
+		element<Card>* card = deck.First();
+		//hand.Add(Card(card->value));
+		player.hand.Emplace(card->value);
+		player.hand.Print("player.hand count " + std::to_string(player.hand.Count()));
+		//hand.Print("hand count " + std::to_string(hand.Count()));
+		//card->Remove();
     }
+
+	int temp = deck.Count();
+	return deck.Count() > 0;
 }
 
 template<typename T, typename ElementToStringFunc>
@@ -467,21 +881,45 @@ void PrintVector(const std::vector<T>& vec, ElementToStringFunc elementToStringF
 }
 
 int main() {
-    std::vector<Card> deck = createDeck();
-    shuffleDeck(deck);
+	Player player(1);
+	player.hand.Emplace(1, 1);
+	player.hand.Print("hand");
+	player.hand.Print("hand", true);
 
-    //Draw cards
-    for (Player& player : players) {
-        playerDraw(player, deck);
-    }
+	std::unique_ptr<linkedList<Card>> deck = createDeck();
+	shuffleDeck(*deck);
 
-    //Print hands
-	auto toString = [](const Card& card) { return card.Name(); };
-    for (const Player& player : players) {
-		PrintVector(player.hand, toString, player.name);//no matching function call to PrintVector
-    }
+	int numberOfPlayers = 4;
+	for (int i = 0; i < numberOfPlayers; i++) {
+		int playerNumber = players.Count();
+		players.Emplace(playerNumber);
+		//players.emplace_back(playerNumber);
+	}
 
-	PrintVector(deck, toString, "Deck");
+	//linkedList<Card> player1Hand(cardToString);
+	//element<Card>* card = deck.First();
+	//player1Hand.Add(Card(card->value));
+	//card->Remove();
+	//player1Hand.Print("Player1Hand");
 
-    return 0;
-}
+	for (element<Player>* player = players.First(); !player->IsEnd(); element<Player>::Inc(player)) {
+		player->value.hand.Emplace(1, 1);
+		player->value.hand.Print("player.hand count " + std::to_string(player->value.hand.Count()));
+	}
+
+	//Draw cards
+	//for (Player& player : players) {
+ //       playerDraw(player, *deck, 5);
+	//	player.hand.Print(player.name + std::to_string(player.hand.Count()));
+	//	player.hand.Print(player.name + std::to_string(player.hand.Count()), true);
+ //   }
+
+	//Print hands
+  //  for (const Player& player : players) {
+		//player.hand.Print(player.name);
+  //  }
+
+	deck->Print("Deck");
+
+	return 0;
+};
