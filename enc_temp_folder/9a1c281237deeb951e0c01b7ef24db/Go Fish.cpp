@@ -1419,17 +1419,18 @@ void UpdateGuessResult(Guess& guess) {
 		//Count the number of cards with the guessed card number.
 		int count = 0;
 		element<Card>::Inc(playersCard);
-		while (!playersCard->IsEnd() && playersCard->previousElement->value.CardNumber() == guessedCardNumber) {
+		while (!playersCard->IsEnd() && playersCard->Prev().CardNumber() == guessedCardNumber) {
 			count++;
 			element<Card>::Inc(playersCard);
 		}
 
 		//4 of a kind, update the four of a kind array and remove the cards from the players hand.
-		if (count == CARDS_PER_SUIT) {
+		if (count == SUITS_PER_DECK) {
+			element<Card>::Dec(playersCard);
 			guess.guessResult = guess.guessResult == GuessResultID::Success ? GuessResultID::Success4OfAKind : GuessResultID::GoFish4OfAKind;
 			FourOfAKinds[guessedCardNumber] = currentPlayerNumber;
-			while (!card->IsFirst() && card->Prev().CardNumber() == guessedCardNumber) {
-				card->previousElement->Remove();
+			while (!playersCard->IsFirst() && playersCard->Prev().CardNumber() == guessedCardNumber) {
+				playersCard->previousElement->Remove();
 			}
 		}
 	}
