@@ -1398,9 +1398,9 @@ void UpdateGuessResult(Guess& guess) {
 		guess.guessResult = GuessResultID::Success;
 		int transfered = 0;
 		element<Card>::Inc(card);
-		while (!card->IsEnd() && card->previousElement->value.CardNumber() == guessedCardNumber) {
+		while (!card->IsEnd() && card->Prev().CardNumber() == guessedCardNumber) {
 			transfered++;
-			int cardID = card->value.CardID;
+			int cardID = card->Prev().CardID;
 			players[currentPlayerNumber]->value.hand.Emplace(cardID);
 			card->previousElement->Remove();
 			element<Card>::Inc(card);
@@ -1428,7 +1428,7 @@ void UpdateGuessResult(Guess& guess) {
 		if (count == CARDS_PER_SUIT) {
 			guess.guessResult = guess.guessResult == GuessResultID::Success ? GuessResultID::Success4OfAKind : GuessResultID::GoFish4OfAKind;
 			FourOfAKinds[guessedCardNumber] = currentPlayerNumber;
-			while (!card->IsFirst() && card->previousElement->value.CardNumber() == guessedCardNumber) {
+			while (!card->IsFirst() && card->Prev().CardNumber() == guessedCardNumber) {
 				card->previousElement->Remove();
 			}
 		}

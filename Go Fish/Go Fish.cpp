@@ -1425,7 +1425,7 @@ void UpdateGuessResult(Guess& guess) {
 		}
 
 		//4 of a kind, update the four of a kind array and remove the cards from the players hand.
-		if (count == CARDS_PER_SUIT) {
+		if (count == SUITS_PER_DECK) {
 			guess.guessResult = guess.guessResult == GuessResultID::Success ? GuessResultID::Success4OfAKind : GuessResultID::GoFish4OfAKind;
 			FourOfAKinds[guessedCardNumber] = currentPlayerNumber;
 			while (!card->IsFirst() && card->Prev().CardNumber() == guessedCardNumber) {
