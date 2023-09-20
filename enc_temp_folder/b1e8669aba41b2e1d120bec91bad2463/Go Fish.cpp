@@ -1428,7 +1428,7 @@ void UpdateGuessResult(Guess& guess) {
 		if (count == CARDS_PER_SUIT) {
 			guess.guessResult = guess.guessResult == GuessResultID::Success ? GuessResultID::Success4OfAKind : GuessResultID::GoFish4OfAKind;
 			FourOfAKinds[guessedCardNumber] = currentPlayerNumber;
-			while (!card->IsFirst() && card->Prev().CardNumber() == guessedCardNumber) {
+			while (!card->IsFirst() && card->previousElement->value.CardNumber() == guessedCardNumber) {
 				card->previousElement->Remove();
 			}
 		}
