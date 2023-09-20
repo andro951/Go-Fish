@@ -1222,8 +1222,10 @@ void Setup() {
 	std::cout << std::endl;
 
 	players.Emplace(0, player0Name);
+	Scores = { 0 };
 	for (int i = 1; i < numberOfPlayers; i++) {
 		players.Emplace(players.Count());
+		Scores.push_back(0);
 	}
 	
 	bool first = true;
