@@ -10,257 +10,34 @@
 #include <sstream>
 #include <map>
 #include <stack>
-#include "Utility.h"
+#include "linkedList.h"
+#include "ConstantsAndGlobals.h"
+#include "Card.h"
+#include "Guess.h"
+#include "NPC.h"
+#include "Player.h"
+#include "PlayerInput.h"
 
 bool testing = true;//If true, you will not be prompted for you name to save time while testing.
 bool autoGuess = true;//If true, your turns will be replaced with automatic guesses to save time while testing.
 
-const int MIN_PLAYERS = 2;
-const int MAX_PLAYERS = 6;
-const int LOCAL_PLAYER_NUMBER = 0;
-const int NO_PLAYER = -1;
-
-const int DECK_SIZE = 52;
-const int CARDS_PER_SUIT = 13;
-const int SUITS_PER_DECK = DECK_SIZE / CARDS_PER_SUIT;
-const std::string cardDisaplayNames[] = { "Ace", "2", "3", "4", "5", "6", "7", "8", "9", "10", "Jack", "Queen", "King" };
-const std::string suitDisplayNames[] = { "Spades", "Hearts", "Clubs", "Diamonds" };
-const std::string DEFAULT_NUM_NAME = "Default Num";
-const std::string DEFAULT_SUIT_NAME = "Default Suit";
-
-static int FourOfAKinds[] = { NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER };
-
-struct Card {
-public:
-    Card() : CardID(DECK_SIZE) {}
-    Card(int cardID) : CardID(cardID) {}
-    Card(int cardNumber, int suit) : CardID(cardNumber * SUITS_PER_DECK + suit) {}
-
-    /// <summary>
-    /// CardID is a number from 0 to 51 representing a playing card.
-    /// </summary>
-    int CardID;
-
-	/// <summary>
-	/// Gets the 0 through 12 card number which is the index for this cards name in cardDisaplayNames.
-	/// </summary>
-    int CardNumber() const {
-        return CardID / SUITS_PER_DECK;
-    }
-
-	/// <summary>
-	/// Gets the 0 through 3 card suit which is the index for this cards name in suitDisplayNames.
-	/// </summary>
-    int Suit() const {
-        return CardID % SUITS_PER_DECK;
-    }
-
-	std::string NumberName() const {
-		return NumberName(CardNumber());
-	}
-
-	static std::string NumberName(int cardNumber) {
-		return cardNumber >= 0 && cardNumber < CARDS_PER_SUIT ? cardDisaplayNames[cardNumber] : DEFAULT_NUM_NAME;
-	}
-
-	std::string SuitName() const {
-		return SuitName(Suit());
-	}
-
-	static std::string SuitName(int suit) {
-		return suit >= 0 && suit < SUITS_PER_DECK ? suitDisplayNames[suit] : DEFAULT_SUIT_NAME;
-	}
-
-    std::string FullName() const {
-        return NumberName() + " of " + SuitName();
-    }
-
-	bool operator==(const Card& other) const {
-		return CardID == other.CardID;
-	}
-
-	bool operator!=(const Card& other) const {
-		return !(*this == other);
-	}
-
-	bool operator<(const Card& other) const {
-		return CardID < other.CardID;
-	}
-
-	bool operator>(const Card& other) const {
-		return CardID > other.CardID;
-	}
-
-	bool operator<=(const Card& other) const {
-		return CardID <= other.CardID;
-	}
-
-	bool operator>=(const Card& other) const {
-		return CardID >= other.CardID;
-	}
-
-	Card(const Card& other) : CardID(other.CardID) {}
-
-	static std::string ToString(const Card& card) {
-		return card.FullName();
-	}
-};
-
-enum GuessResultID {
-	None,
-	FailGoFish,
-	Success,
-	Success4OfAKind,
-	GoFish4OfAKind
-};
-
-class Player;
-
-struct Guess {
-	Guess () : targetPlayerNumber(-1), currentPlayerNumber(-1), card(Card(DECK_SIZE)), guessResult(GuessResultID::None), numberOfCardsRecieved(-1) {}
-	Guess(int TargetPlayerNumber, int CurrentPlayerNumber, int CardID, int GuessResult = GuessResultID::None, int NumberOfCardsRecieved = 1) : 
-		targetPlayerNumber(TargetPlayerNumber), currentPlayerNumber(CurrentPlayerNumber), card(CardID, 0),
-		guessResult(GuessResult), numberOfCardsRecieved(NumberOfCardsRecieved) {}
-
-	int targetPlayerNumber;
-	int currentPlayerNumber;
-	Card card;
-	int guessResult;
-	int numberOfCardsRecieved;
-
-	std::string GuessToString(std::string(*GetPlayerNameFunc)(int)) {
-		return GetPlayerNameFunc(currentPlayerNumber) + ": " + GetPlayerNameFunc(targetPlayerNumber) + ", do you have any " + card.NumberName() + "'s?";
-	}
-
-	void PrintGuess(std::string(*GetPlayerNameFunc)(int)) {
-		std::cout << GuessToString(GetPlayerNameFunc) << std::endl;
-	}
-
-	std::string ResultToString(std::string(*GetPlayerNameFunc)(int)) {
-		std::string result = GetPlayerNameFunc(targetPlayerNumber) + ": ";
-		switch (guessResult) {
-			case GuessResultID::None:
-				result += "None";
-				break;
-			case GuessResultID::FailGoFish:
-			case GuessResultID::GoFish4OfAKind:
-				result += "No, Go Fish!";
-				break;
-			case GuessResultID::Success:
-			case GuessResultID::Success4OfAKind:
-				result += "Yes, I have " + std::to_string(numberOfCardsRecieved) + " " + card.NumberName() + (numberOfCardsRecieved > 1 ? "s" : "") + ".";
-				break;
-			default:
-				result += "Unknown";
-				break;
-		}
-
-		result += "\n";
-
-		switch (guessResult) {
-			case GuessResultID::None:
-				result += "None";
-				break;
-			case GuessResultID::FailGoFish:
-			case GuessResultID::GoFish4OfAKind:
-				result += GetPlayerNameFunc(currentPlayerNumber) + ": {Draws a card from the pile}";
-				if (guessResult == GuessResultID::GoFish4OfAKind)
-					result += "\nLuck of the draw!  Four of a kind! (" + card.NumberName() + ")";
-
-				break;
-			case GuessResultID::Success:
-				result += GetPlayerNameFunc(currentPlayerNumber) + ": Thank you!";
-				break;
-			case GuessResultID::Success4OfAKind:
-				result += GetPlayerNameFunc(currentPlayerNumber) + "Nice, four of a kind! (" + card.NumberName() + ")";
-				break;
-			default:
-				result += "Unknown";
-				break;
-		}
-
-		return result;
-	}
-
-	void PrintResult(std::string(*GetPlayerNameFunc)(int)) {
-		std::cout << ResultToString(GetPlayerNameFunc) << std::endl << std::endl;
-	}
-};
-
-std::vector<Guess> lastGuesses;
-
-class NPC {
-	virtual Guess NextGuess() = 0;
-};
-
-class RandomizerAI : NPC {
-public:
-	RandomizerAI(int PlayerNumber, int PlayerCount) : playerNumber(PlayerNumber), playerCount(PlayerCount) {}
-	int playerNumber;
-	int playerCount;
-	Guess NextGuess() override {
-		int randomPlayerNumber = rand() % (playerCount - 1);
-		if (randomPlayerNumber >= playerNumber)
-			randomPlayerNumber++;
-
-		int randomCardNumber;
-		do {
-			randomCardNumber = rand() % CARDS_PER_SUIT;
-		} while (FourOfAKinds[randomCardNumber] != -1);
-
-		return Guess(randomPlayerNumber, playerNumber, randomCardNumber);
-	}
-};
-
-class Player {
-	Player(const Player& other) = delete;//Delete copy constructor to prevent copying Player objects.
-public:
-	int playerNumber;
-	Player() : playerNumber(-1), name("Default"), hand(Card::ToString, true) {}
-	Player(int PlayerNumber) : playerNumber(PlayerNumber), name("Player " + std::to_string(playerNumber)), hand(Card::ToString, true) {}
-	Player(int PlayerNumber, std::string FullName) : playerNumber(PlayerNumber), name(FullName), hand(Card::ToString, true) {}
-	std::string name;
-	linkedList<Card> hand;
-
-	/// <summary>
-	/// Move constructor used to move a player from one container to another when using std containers.
-	/// </summary>
-	Player(Player&& other) noexcept : playerNumber(std::move(other.playerNumber)), name(std::move(other.name)), hand(std::move(other.hand)) {}
-
-	bool operator==(const Player& other) const {
-		return playerNumber == other.playerNumber;
-	}
-
-	bool operator!=(const Player& other) const {
-		return !(*this == other);
-	}
-
-	bool operator<(const Player& other) const {
-		return playerNumber < other.playerNumber;
-	}
-
-	bool operator>(const Player& other) const {
-		return playerNumber > other.playerNumber;
-	}
-
-	bool operator<=(const Player& other) const {
-		return playerNumber <= other.playerNumber;
-	}
-
-	bool operator>=(const Player& other) const {
-		return playerNumber >= other.playerNumber;
-	}
-
-	static std::string ToString(const Player& player) {
-		return player.name;
-	}
-};
-
+std::vector<Guess> lastGuesses;//The last round of guesses are kept for the local player to see during their turn.
 linkedList<Player> players(Player::ToString);
 std::stack<Card> deck;
 element<Player>* currentPlayer;
-std::vector<int> Scores;
+std::vector<int> Scores;//Not used until the end of the game when the scores are tallied.
 
+/// <summary>
+/// Gets the player number.  Passed to Guess for printing the result of the guess.
+/// This helps minimize circular dependencies.
+/// </summary>
+std::string GetPlayerName(int playerNumber) {
+	return players[playerNumber]->value.name;
+}
+
+/// <summary>
+/// Creates a linked list of cards that are ordered.
+/// </summary>
 std::unique_ptr<linkedList<Card>> createDeck() {
 	std::unique_ptr <linkedList<Card>> deck = std::make_unique<linkedList<Card>>(Card::ToString);
     for (int i = 0; i < SUITS_PER_DECK; ++i) {
@@ -272,6 +49,9 @@ std::unique_ptr<linkedList<Card>> createDeck() {
     return deck;
 };
 
+/// <summary>
+/// The player draws num card(s) from the deck.
+/// </summary
 bool playerDraw(Player& player, std::stack<Card>& deck, int num = 1) {
     for (int i = 0; i < num; i++) {
 		Card card = deck.top();
@@ -284,143 +64,18 @@ bool playerDraw(Player& player, std::stack<Card>& deck, int num = 1) {
 	return deck.size() > 0;
 }
 
-#pragma region Player Input
-
-//From previous projects
-
-std::string join(const std::vector<std::string>& list_strings, const std::string& separator = "\n") {
-	std::string result = "";
-	bool first = true;
-	for (const auto& s : list_strings) {
-		if (first) {
-			first = false;
-		}
-		else {
-			result += separator;
-		}
-
-		result += s;
-	}
-
-	return result;
-}
-
-bool is_integer(const std::string& str) {
-	if (str.empty())
-		return false;
-
-	bool found_minus = (str[0] == '-');
-	for (int i = (found_minus ? 1 : 0); i < str.length(); i++) {
-		if (!isdigit(str[i]))
-			return false;
-	}
-
-	return true;
-}
-
-std::string get_integer_inputs(const std::string& prompt, std::vector<int>& integers, bool display = true) {
-	if (display)
-		std::cout << prompt << std::endl;
-
-	std::string answer;
-	std::getline(std::cin, answer);
-	std::vector<std::string> answer_list;
-	std::stringstream ss(answer);
-	std::string temp;
-	while (std::getline(ss, temp, ' ')) {
-		answer_list.push_back(temp);
-	}
-
-	for (const auto& str : answer_list) {
-		std::string stripped_str = str;
-		stripped_str.erase(remove(stripped_str.begin(), stripped_str.end(), ','), stripped_str.end());
-		if (is_integer(stripped_str))
-			integers.push_back(stoi(stripped_str));
-	}
-
-	return answer;
-}
-
-int get_integer_input(const std::string& prompt, bool display = true) {
-	std::vector<int> integers;
-	std::string answer = get_integer_inputs(prompt, integers, display);
-
-	if (integers.size() == 1) {
-		return integers[0];
-	}
-	else if (integers.size() > 1) {
-		std::cout << "Received multiple numbers." << std::endl;
-	}
-	else {
-		if (answer != "") {
-			std::cout << answer << " is not a whole number." << std::endl;
-		}
-		else {
-			return get_integer_input(prompt, false);
-		}
-	}
-
-	return get_integer_input(prompt);
-}
-
-int get_integer_input_in_range(const std::string& prompt, int range_min, int range_max) {
-	int value = -1;
-	bool getting_input = true;
-	while (getting_input) {
-		value = get_integer_input(prompt);
-		if (value < range_min || value > range_max) {
-			std::cout << value << " is out of range." << std::endl;
-		}
-		else {
-			getting_input = false;
-		}
-	}
-
-	return value;
-}
-
-int get_option(const std::vector<std::string>& option_list) {
-	// List of all options with number labels
-	std::vector<std::string> options;
-	for (int i = 0; i < option_list.size(); i++) {
-		options.push_back(std::to_string(i + 1) + ". " + option_list[i]);
-	}
-
-	std::string prompt = join(options) + "\n";
-	return get_integer_input_in_range(prompt, 1, option_list.size()) - 1;
-}
-
-template<size_t S>
-int get_option(const std::string(&option_list)[S]) {
-	// List of all options with number labels
-	std::vector<std::string> options;
-	for (int i = 0; i < S; i++) {
-		options.push_back(std::to_string(i + 1) + ". " + option_list[i]);
-	}
-
-	std::string prompt = join(options) + "\n";
-	return get_integer_input_in_range(prompt, 1, S) - 1;
-}
-
-#pragma endregion
-
-/// <summary>
-/// Gets the player number.  Passed to Guess for printing the result of the guess.
-/// This helps minimize circular dependencies.
-/// </summary>
-std::string GetPlayerName(int playerNumber) {
-	return players[playerNumber]->value.name;
-}
-
-void Setup() {
-	std::srand(static_cast<unsigned int>(std::time(nullptr)));
-
+int GetNumberOfPlayers() {
 	std::cout << "Hello!\n";
 	std::cout << "Who's ready for an exciting fame of Go Fish?!\n\n";
 
 	std::string playersPrimpt = "How many NPC players would you like to play with? (1 - 5)";
 	int numberOfPlayers = !testing ? get_integer_input_in_range(playersPrimpt, MIN_PLAYERS - 1, MAX_PLAYERS - 1) + 1 : 2;
 	std::cout << std::endl;
+
+	return numberOfPlayers;
+}
+
+std::string GetLocalPlayerName() {
 	std::cout << "What is your name?\n";
 	std::string player0Name = testing ? "Local Player" : "";
 	if (!testing)
@@ -428,13 +83,19 @@ void Setup() {
 
 	std::cout << std::endl;
 
+	return player0Name;
+}
+
+void PopulatePlayersAndScores(int numberOfPlayers, std::string player0Name) {
 	players.Emplace(0, player0Name);
 	Scores = { 0 };
 	for (int i = 1; i < numberOfPlayers; i++) {
 		players.Emplace(players.Count());
 		Scores.push_back(0);
 	}
-	
+}
+
+void PrintPlayers() {
 	bool first = true;
 	for (element<Player>* player = players.First()->nextElement; !player->IsEnd(); element<Player>::Inc(player)) {
 		if (first) {
@@ -452,40 +113,65 @@ void Setup() {
 		std::cout << player->value.name;
 	}
 
-	std::cout << " " << (numberOfPlayers > 2 ? "have" : "has") << " joined the game.\n\n";
+	std::cout << " " << (players.Count() > 2 ? "have" : "has") << " joined the game.\n\n";
+}
 
+void SelectFirstPlayer() {
 	currentPlayer = players[std::rand() % players.Count()];
 	std::cout << currentPlayer->value.name << " is up first.\n\n";
+}
 
+void CreateAndShuffleDeck() {
 	std::unique_ptr<linkedList<Card>> deckList = createDeck();
 	deckList->Shuffle();
 	deck = deckList->ToStack();
+}
 
-	int startingCards = numberOfPlayers > 2 ? 5 : 7;
+void DealOpeningHands() {
+	int startingCards = players.Count() > 2 ? 5 : 7;
 	for (element<Player>* player = players.First(); !player->IsEnd(); element<Player>::Inc(player)) {
 		playerDraw(player->value, deck, startingCards);
 	}
+}
 
-	bool printHandsAndDeck = false;
-	if (printHandsAndDeck) {
-		for (element<Player>* player = players.First(); !player->IsEnd(); element<Player>::Inc(player)) {
-			player->value.hand.Print(player->value.name + " hand (" + std::to_string(player->value.hand.Count()) + ")");
-		}
-
-		std::cout << std::endl;
-
-		std::stack<Card> deckCopy = deck;
-		std::cout << "Deck (" << deckCopy.size() << "): ";
-		while (!deckCopy.empty()) {
-			std::cout << Card::ToString(deckCopy.top()) << " ";
-			deckCopy.pop();
-		}
+void PrintHandsAndDeck() {
+	for (element<Player>* player = players.First(); !player->IsEnd(); element<Player>::Inc(player)) {
+		player->value.hand.Print(player->value.name + " hand (" + std::to_string(player->value.hand.Count()) + ")");
 	}
 
+	std::cout << std::endl;
+
+	std::stack<Card> deckCopy = deck;
+	std::cout << "Deck (" << deckCopy.size() << "): ";
+	while (!deckCopy.empty()) {
+		std::cout << Card::ToString(deckCopy.top()) << " ";
+		deckCopy.pop();
+	}
+}
+
+void SetupLastGuesses() {
 	//Fill guesses vector with empty guesses for each player.
 	for (int i = 0; i < players.Count(); i++) {
 		lastGuesses.emplace_back();
 	}
+}
+
+void Setup() {
+	//Seed the random number generator with the current time.
+	std::srand(static_cast<unsigned int>(std::time(nullptr)));
+
+	int numberOfPlayers = GetNumberOfPlayers();
+	std::string player0Name = GetLocalPlayerName();
+	PopulatePlayersAndScores(numberOfPlayers, player0Name);
+	PrintPlayers();
+	SelectFirstPlayer();
+	CreateAndShuffleDeck();
+
+	bool printHandsAndDeck = false;
+	if (printHandsAndDeck)
+		PrintHandsAndDeck();//For testing
+
+	SetupLastGuesses();
 }
 
 void PrintLocalPlayersHand() {
@@ -495,6 +181,7 @@ void PrintLocalPlayersHand() {
 
 void PrintFourOfAKinds() {
 	bool atLeastOneFourOfAKind = false;
+	//Check if any for of a kinds have been turned in.
 	for (int i = 0; i < CARDS_PER_SUIT; i++) {
 		if (FourOfAKinds[i] != NO_PLAYER) {
 			atLeastOneFourOfAKind = true;
@@ -502,24 +189,31 @@ void PrintFourOfAKinds() {
 		}
 	}
 
+	//If none turned in, return
 	if (!atLeastOneFourOfAKind) {
 		std::cout << "No four of a kinds have been turned in.\n\n";
 		return;
 	}
 
+	
 	std::cout << "Four of a kinds:\n";
+
+	//Create a multi-dimensional vector to hold the four of a kinds for each player so that they can be printed per player.
+
+	//Create the empty vectors
 	std::vector<std::vector<int>> fourOfAKinds;
 	for (int i = 0; i < players.Count(); i++) {
 		fourOfAKinds.emplace_back();
 	}
 
+	//Fill the vectors
 	for (int i = 0; i < CARDS_PER_SUIT; i++) {
 		int playerNumber = FourOfAKinds[i];
-		if (playerNumber != NO_PLAYER) {
+		if (playerNumber != NO_PLAYER)
 			fourOfAKinds[playerNumber].push_back(i);
-		}
 	}
 
+	//Print the vectors
 	for (int i = 0; i < fourOfAKinds.size(); i++) {
 		const std::vector<int>& playerFourOfAKind = fourOfAKinds[i];
 		int size = playerFourOfAKind.size();
@@ -562,12 +256,14 @@ void PrintLastRoundOfGuesses() {
 }
 
 Guess GetNPCGuess() {
-	RandomizerAI randomizer(currentPlayer->value.playerNumber, players.Count());//Move this to be part of the player class.
+	//Use RandomizerAI to get a guess for another player and card number that hasn't been turned in as a four of a kind.
+	RandomizerAI randomizer(currentPlayer->value.playerNumber, players.Count());
 
 	return randomizer.NextGuess();
 }
 
 Guess GetPlayerGuess() {
+	//Prompt the local player for another player and card number.
 	int targetPlayerNumber = 1;
 	if (players.Count() > 2) {
 		std::string prompt = "What player would you like to guess? (2 - " + std::to_string(players.Count()) + ")";
@@ -589,13 +285,16 @@ void Quit() {
 }
 
 Guess PlayerOptions() {
+	//autoGuess is meant for testing so each turn doesn't have to be manually played while testing.
 	if (autoGuess)
 		return GetNPCGuess();
 
+	//Prompt the local player for what they would like to do.
 	std::vector<std::string> playerOptions = { "Guess", "Check My Hand", "View Four of a kinds", "Check last round of guesses", "Quit"};
 	void (*playerOptionsFunctions[])() = { PrintLocalPlayersHand, PrintFourOfAKinds, PrintLastRoundOfGuesses, Quit };
 	int selectedOption = get_option(playerOptions);
 
+	//Call the function for the selected option.
 	if (selectedOption == 0) {
 		return GetPlayerGuess();
 	}
@@ -608,19 +307,32 @@ Guess PlayerOptions() {
 
 void UpdateGuessResult(Guess& guess) {
 	//Check if the guess is correct.
+
 	int currentPlayerNumber = guess.currentPlayerNumber;
-	Card lowestCardOfNumber(guess.card.CardNumber(), 0);
-	element<Card>* card = players[guess.targetPlayerNumber]->value.hand.FindInsertElement(lowestCardOfNumber, false);
-	int guessedCardNumber = guess.card.CardNumber();
-	if (!card->IsEnd() && card->value.CardNumber() == guessedCardNumber) {
+
+	//lowestCardOfNumber is used because it minimizes the amount of searching through a players hand because the result will always be the first card of the number.
+	//Example: If the guessed card number is 3, then the lowest card number will be 8 because 3's are 8, 9, 10, and 11, 
+	//	so the insert index will land at the index of the first 3 in the hand if any.  After that, increment to the right/up until no more 3's are found.
+	// 
+	//Do you have any 3's?
+	//Other players hand { 0, 3, 7, 8, 10, 11, 12, 51 }
+	//                   { A, A, 2, 3,  3,  3,  4,  K }
+	Card lowestCardOfNumber(guess.card.CardNumber(), 0);//lowestCardOfNumber = 12
+	element<Card>* card = players[guess.targetPlayerNumber]->value.hand.FindInsertElement(lowestCardOfNumber, false);//card = 8 (3 of Spades)
+	int guessedCardNumber = guess.card.CardNumber();//guessedCardNumber = 3
+	if (!card->IsEnd() && card->value.CardNumber() == guessedCardNumber) {//not the end of the list and card number (3) == guessedCardNumber (3)
 		guess.guessResult = GuessResultID::Success;
 		int transfered = 0;
-		element<Card>::Inc(card);
-		while (card->Prev().CardNumber() == guessedCardNumber) {
+		element<Card>::Inc(card);//Because the cards will be removed, the card is incremented and the previous card is removed.  card = 10 (3 of Clubs)
+		while (card->Prev().CardNumber() == guessedCardNumber) {//previous card number 8 (3 of Spades) == guessedCardNumber (3)
 			transfered++;
 			int cardID = card->Prev().CardID;
-			players[currentPlayerNumber]->value.hand.Emplace(cardID);
-			card->previousElement->Remove();
+			//"Give" the card to the current player.
+			players[currentPlayerNumber]->value.hand.Emplace(cardID);//Create the card in asking players hand.
+			card->previousElement->Remove();//Remove the card from player being asked's hand.
+
+			//In the linkedList, there is a dummy element (the end) that helps with iterating through the list.
+			//If the current card (which is still leading the one being looked at by 1) is the end, the card being looked at is the last in the hand, so stop.
 			if (card->IsEnd())
 				break;
 
@@ -630,6 +342,7 @@ void UpdateGuessResult(Guess& guess) {
 		guess.numberOfCardsRecieved = transfered;
 	}
 	else {
+		//The other player doesn't have any 3's (or whatever the guessed card number was)
 		guess.guessResult = GuessResultID::FailGoFish;
 		playerDraw(currentPlayer->value, deck);
 	}
@@ -640,6 +353,8 @@ void UpdateGuessResult(Guess& guess) {
 		//Count the number of cards with the guessed card number.
 		int count = 0;
 		element<Card>::Inc(playersCard);
+		//Like before, start at the next element and look at the previous card to see if it matches the number.
+		//Not required to do it this way this time because cards aren't being removed, but it was easy to copy/paste something that was already working.
 		while (playersCard->Prev().CardNumber() == guessedCardNumber) {
 			count++;
 			if (playersCard->IsEnd())
@@ -650,15 +365,18 @@ void UpdateGuessResult(Guess& guess) {
 
 		//4 of a kind, update the four of a kind array and remove the cards from the players hand.
 		if (count == SUITS_PER_DECK) {
+			//Remove all of the cards of the 4 of a kind number from the players hand.
 			element<Card>::Dec(playersCard);
 			guess.guessResult = guess.guessResult == GuessResultID::Success ? GuessResultID::Success4OfAKind : GuessResultID::GoFish4OfAKind;
 			FourOfAKinds[guessedCardNumber] = currentPlayerNumber;
 			while (!playersCard->IsFirst() && playersCard->Prev().CardNumber() == guessedCardNumber) {
+				//Since the hand is sorted and the cards are all being removed, the playersCard doesn't need to be incremented as removing the previous 
 				playersCard->previousElement->Remove();
 			}
 		}
 	}
 
+	//If the player guessed wrong, it is the next players turn.
 	if (guess.guessResult == GuessResultID::FailGoFish) {
 		element<Player>::Inc(currentPlayer);
 		if (currentPlayer->IsEnd())
@@ -686,6 +404,7 @@ void EndGame() {
 	std::cout << "Game Over!\n";
 	std::cout << "Final Scores:\n";
 
+	//Count the number of 4 of a kinds each player has.
 	for (const int& playerScoreNumber : FourOfAKinds) {
 		if (playerScoreNumber == NO_PLAYER)
 			continue;
@@ -693,6 +412,7 @@ void EndGame() {
 		Scores[playerScoreNumber]++;
 	}
 
+	//Use a vector for winners in case of a tie.
 	int highestScore = Scores[0];
 	std::vector<int> winners = { 0 };
 	for (int i = 1; i < Scores.size(); i++) {
@@ -706,10 +426,12 @@ void EndGame() {
 		}
 	}
 
+	//Print the scores.
 	for (element<Player>* player = players.First(); !player->IsEnd(); element<Player>::Inc(player)) {
 		std::cout << player->value.name << ": " << Scores[player->value.playerNumber] << std::endl;
 	}
 
+	//Print the winner(s).
 	std::cout << std::endl;
 	if (winners.size() == 1) {
 		std::cout << "Congratulations " << players[winners[0]]->value.name << ", you are the winner!\n";

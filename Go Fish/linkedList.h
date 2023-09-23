@@ -1,9 +1,3 @@
-/*
-Author - Isaac Richards
-Date - 04SEP23
-Description - Template functions for searching and sorting arrays.
-*/
-
 #pragma once
 
 #include <iostream>

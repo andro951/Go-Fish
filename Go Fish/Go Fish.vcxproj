@@ -130,8 +130,14 @@
     <ClCompile Include="Go Fish.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="NPC.h" />
     <ClInclude Include="BigWheelSieve.h" />
-    <ClInclude Include="Utility.h" />
+    <ClInclude Include="Card.h" />
+    <ClInclude Include="ConstantsAndGlobals.h" />
+    <ClInclude Include="Guess.h" />
+    <ClInclude Include="linkedList.h" />
+    <ClInclude Include="Player.h" />
+    <ClInclude Include="PlayerInput.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
