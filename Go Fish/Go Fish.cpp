@@ -970,75 +970,9 @@ class NPC {
 	virtual Guess NextGuess() = 0;
 };
 
-class ObserverAI : NPC {
-	//const std::string names[] = { "Sheldon", "Leonard", "Hermione", "Dexter", "Neo" };
-public:
-	ObserverAI(int PlayerNumber, int PlayerCount) : playerNumber(PlayerNumber), playerCount(PlayerCount) {}
-	int playerNumber;
-	int playerCount;
-	int cards[SUITS_PER_DECK][CARDS_PER_SUIT] = {
-		{ NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER },
-		{ NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER },
-		{ NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER },
-		{ NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER }
-	};
-
-	std::map<int, std::vector<int>> playerFailedGuesses;
-
-	void UpdateCardStatus(const Guess& guess) {
-		int cardNumber = guess.card.CardNumber();
-		int targetPlayerNumber = guess.targetPlayerNumber;
-		int currentPlayerNumber = guess.currentPlayerNumber;
-
-		if (guess.currentPlayerNumber != playerNumber)
-			playerFailedGuesses.insert({  });
-	}
-
-	Guess NextGuess() override {
-		Guess& myLastGuess = lastGuesses[playerNumber];
-
-		//If my last turn was a failure, I need to update my "notepad" of card statuses from the other players turns.
-		if (myLastGuess.guessResult == GuessResultID::FailGoFish || myLastGuess.guessResult == GuessResultID::GoFish4OfAKind) {
-			playerFailedGuesses.clear();
-
-			//Check all other player guesses and update my "notepad" of card statuses, cards array.
-			//Looks at the players in order of who took their turn after me.
-			for (element<Player>* player = players[playerNumber]->nextElement; !player->value.playerNumber != playerNumber; element<Player>::Inc(player)) {
-				if (player->IsEnd())
-					player = players.First();
-
-				UpdateCardStatus(lastGuesses[player->value.playerNumber]);
-			}
-		}
-
-		//Update my "notepad" of card statuses from my last turn.
-		if (myLastGuess.guessResult != GuessResultID::None)
-			UpdateCardStatus(myLastGuess);
-	}
-};
-
 class RandomizerAI : NPC {
 public:
 	RandomizerAI(int PlayerNumber, int PlayerCount) : playerNumber(PlayerNumber), playerCount(PlayerCount) {}
-	int playerNumber;
-	int playerCount;
-	Guess NextGuess() override {
-		int randomPlayerNumber = rand() % (playerCount - 1);
-		if (randomPlayerNumber >= playerNumber)
-			randomPlayerNumber++;
-
-		int randomCardNumber;
-		do {
-			randomCardNumber = rand() % CARDS_PER_SUIT;
-		} while (FourOfAKinds[randomCardNumber] != -1);
-
-		return Guess(randomPlayerNumber, playerNumber, randomCardNumber);
-	}
-};
-
-class SequencerAI : NPC {
-public:
-	SequencerAI(int PlayerNumber, int PlayerCount) : playerNumber(PlayerNumber), playerCount(PlayerCount) {}
 	int playerNumber;
 	int playerCount;
 	Guess NextGuess() override {
@@ -1401,6 +1335,12 @@ void PrintLastRoundOfGuesses() {
 	std::cout << std::endl;
 }
 
+Guess GetNPCGuess() {
+	RandomizerAI randomizer(currentPlayer->value.playerNumber, players.Count());//Move this to be part of the player class.
+
+	return randomizer.NextGuess();
+}
+
 Guess GetPlayerGuess() {
 	int targetPlayerNumber = 1;
 	if (players.Count() > 2) {
@@ -1423,6 +1363,9 @@ void Quit() {
 }
 
 Guess PlayerOptions() {
+	if (autoGuess)
+		return GetNPCGuess();
+
 	std::vector<std::string> playerOptions = { "Guess", "Check My Hand", "View Four of a kinds", "Check last round of guesses", "Quit"};
 	void (*playerOptionsFunctions[])() = { PrintLocalPlayersHand, PrintFourOfAKinds, PrintLastRoundOfGuesses, Quit };
 	int selectedOption = get_option(playerOptions);
@@ -1437,27 +1380,24 @@ Guess PlayerOptions() {
 	}
 }
 
-Guess GetNPCGuess() {
-	ObserverAI observer(currentPlayer->value.playerNumber, players.Count());//Move this to be part of the player class.
-
-	return observer.NextGuess();
-}
-
 void UpdateGuessResult(Guess& guess) {
 	//Check if the guess is correct.
 	int currentPlayerNumber = guess.currentPlayerNumber;
 	Card lowestCardOfNumber(guess.card.CardNumber(), 0);
 	element<Card>* card = players[guess.targetPlayerNumber]->value.hand.FindInsertElement(lowestCardOfNumber, false);
 	int guessedCardNumber = guess.card.CardNumber();
-	if (card->value.CardNumber() == guessedCardNumber) {
+	if (!card->IsEnd() && card->value.CardNumber() == guessedCardNumber) {
 		guess.guessResult = GuessResultID::Success;
 		int transfered = 0;
 		element<Card>::Inc(card);
-		while (!card->IsEnd() && card->Prev().CardNumber() == guessedCardNumber) {
+		while (card->Prev().CardNumber() == guessedCardNumber) {
 			transfered++;
 			int cardID = card->Prev().CardID;
 			players[currentPlayerNumber]->value.hand.Emplace(cardID);
 			card->previousElement->Remove();
+			if (card->IsEnd())
+				break;
+
 			element<Card>::Inc(card);
 		}
 
@@ -1474,8 +1414,11 @@ void UpdateGuessResult(Guess& guess) {
 		//Count the number of cards with the guessed card number.
 		int count = 0;
 		element<Card>::Inc(playersCard);
-		while (!playersCard->IsEnd() && playersCard->Prev().CardNumber() == guessedCardNumber) {
+		while (playersCard->Prev().CardNumber() == guessedCardNumber) {
 			count++;
+			if (playersCard->IsEnd())
+				break;
+
 			element<Card>::Inc(playersCard);
 		}
 
@@ -1518,6 +1461,9 @@ void EndGame() {
 	std::cout << "Final Scores:\n";
 
 	for (const int& playerScoreNumber : FourOfAKinds) {
+		if (playerScoreNumber == NO_PLAYER)
+			continue;
+
 		Scores[playerScoreNumber]++;
 	}
 
