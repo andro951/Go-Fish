@@ -20,9 +20,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="BigWheelSieve.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="linkedList.h">
       <Filter>Header Files</Filter>
     </ClInclude>

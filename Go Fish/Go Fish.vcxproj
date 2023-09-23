@@ -131,7 +131,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="NPC.h" />
-    <ClInclude Include="BigWheelSieve.h" />
     <ClInclude Include="Card.h" />
     <ClInclude Include="ConstantsAndGlobals.h" />
     <ClInclude Include="Guess.h" />
