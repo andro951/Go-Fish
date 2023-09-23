@@ -8,6 +8,7 @@
 #include <memory>
 #include <chrono>
 #include <sstream>
+#include <map>
 
 template<typename T>
 class linkedList;
@@ -963,14 +964,62 @@ struct Guess {
 	}
 };
 
+std::vector<Guess> lastGuesses;
+
 class NPC {
 	virtual Guess NextGuess() = 0;
 };
 
-class Observer : NPC {
+class ObserverAI : NPC {
 	//const std::string names[] = { "Sheldon", "Leonard", "Hermione", "Dexter", "Neo" };
 public:
-	Observer(int PlayerNumber, int PlayerCount) : playerNumber(PlayerNumber), playerCount(PlayerCount) {}
+	ObserverAI(int PlayerNumber, int PlayerCount) : playerNumber(PlayerNumber), playerCount(PlayerCount) {}
+	int playerNumber;
+	int playerCount;
+	int cards[SUITS_PER_DECK][CARDS_PER_SUIT] = {
+		{ NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER },
+		{ NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER },
+		{ NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER },
+		{ NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER, NO_PLAYER }
+	};
+
+	std::map<int, std::vector<int>> playerFailedGuesses;
+
+	void UpdateCardStatus(const Guess& guess) {
+		int cardNumber = guess.card.CardNumber();
+		int targetPlayerNumber = guess.targetPlayerNumber;
+		int currentPlayerNumber = guess.currentPlayerNumber;
+
+		if (guess.currentPlayerNumber != playerNumber)
+			playerFailedGuesses.insert({  });
+	}
+
+	Guess NextGuess() override {
+		Guess& myLastGuess = lastGuesses[playerNumber];
+
+		//If my last turn was a failure, I need to update my "notepad" of card statuses from the other players turns.
+		if (myLastGuess.guessResult == GuessResultID::FailGoFish || myLastGuess.guessResult == GuessResultID::GoFish4OfAKind) {
+			playerFailedGuesses.clear();
+
+			//Check all other player guesses and update my "notepad" of card statuses, cards array.
+			//Looks at the players in order of who took their turn after me.
+			for (element<Player>* player = players[playerNumber]->nextElement; !player->value.playerNumber != playerNumber; element<Player>::Inc(player)) {
+				if (player->IsEnd())
+					player = players.First();
+
+				UpdateCardStatus(lastGuesses[player->value.playerNumber]);
+			}
+		}
+
+		//Update my "notepad" of card statuses from my last turn.
+		if (myLastGuess.guessResult != GuessResultID::None)
+			UpdateCardStatus(myLastGuess);
+	}
+};
+
+class RandomizerAI : NPC {
+public:
+	RandomizerAI(int PlayerNumber, int PlayerCount) : playerNumber(PlayerNumber), playerCount(PlayerCount) {}
 	int playerNumber;
 	int playerCount;
 	Guess NextGuess() override {
@@ -981,24 +1030,28 @@ public:
 		int randomCardNumber;
 		do {
 			randomCardNumber = rand() % CARDS_PER_SUIT;
-		}
-		while (FourOfAKinds[randomCardNumber] != -1);
+		} while (FourOfAKinds[randomCardNumber] != -1);
 
 		return Guess(randomPlayerNumber, playerNumber, randomCardNumber);
 	}
 };
 
-class Randomizer : NPC {
+class SequencerAI : NPC {
 public:
+	SequencerAI(int PlayerNumber, int PlayerCount) : playerNumber(PlayerNumber), playerCount(PlayerCount) {}
+	int playerNumber;
+	int playerCount;
 	Guess NextGuess() override {
-		return Guess(0, 0, 0);
-	}
-};
+		int randomPlayerNumber = rand() % (playerCount - 1);
+		if (randomPlayerNumber >= playerNumber)
+			randomPlayerNumber++;
 
-class Trickster : NPC {
-public:
-	Guess NextGuess() override {
-		return Guess(0, 0, 0);
+		int randomCardNumber;
+		do {
+			randomCardNumber = rand() % CARDS_PER_SUIT;
+		} while (FourOfAKinds[randomCardNumber] != -1);
+
+		return Guess(randomPlayerNumber, playerNumber, randomCardNumber);
 	}
 };
 
@@ -1049,7 +1102,6 @@ public:
 linkedList<Player> players(Player::ToString);
 std::unique_ptr<linkedList<Card>> deck;
 element<Player>* currentPlayer;
-std::vector<Guess> lastGuesses;
 std::vector<int> Scores;
 
 std::unique_ptr<linkedList<Card>> createDeck() {
@@ -1204,6 +1256,7 @@ std::string GetPlayerName(int playerNumber) {
 }
 
 bool testing = true;
+bool autoGuess = true;
 
 void Setup() {
 	std::srand(static_cast<unsigned int>(std::time(nullptr)));
@@ -1385,7 +1438,7 @@ Guess PlayerOptions() {
 }
 
 Guess GetNPCGuess() {
-	Observer observer(currentPlayer->value.playerNumber, players.Count());//Move this to be part of the player class.
+	ObserverAI observer(currentPlayer->value.playerNumber, players.Count());//Move this to be part of the player class.
 
 	return observer.NextGuess();
 }
